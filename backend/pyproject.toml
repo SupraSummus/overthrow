@@ -8,6 +8,7 @@ authors = ["Jan Rydzewski <flegmer@gmail.com>"]
 python = "^3.8"
 django = "2.2.*"
 psycopg2 = "^2.8.4"
+django-environ = "^0.4.5"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^3.7.9"
