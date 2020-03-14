@@ -1,11 +1,14 @@
 import store from "./store";
 
+const api_port = 8000;
+const api_url = `${window.location.protocol}//${window.location.hostname}:${api_port}/api/`;
+
 const call_api = ({ method, path, payload }) => {
   const headers = { "Content-Type": "application/json" };
   if (store.state.auth.token) {
     headers["Authorization"] = "Token " + store.state.auth.token;
   }
-  return fetch("http://localhost:8000/api/" + path, {
+  return fetch(api_url + path, {
     method,
     headers,
     body: JSON.stringify(payload),
