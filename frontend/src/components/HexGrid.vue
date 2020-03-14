@@ -18,6 +18,7 @@
 
 <script>
 import HexTile from "./HexTile.vue";
+import call_api from "../api";
 
 export default {
   components: {
@@ -25,13 +26,16 @@ export default {
   },
   data: () => {
     return {
-      tiles: [
-        { id: 0, x: 0, y: 0, z: 0 },
-        { id: 1, x: 1, y: 1, z: -2 },
-        { id: 2, x: 1, y: 0, z: -1 },
-        { id: 4, x: 0, y: 1, z: -1 },
-      ],
+      tiles: [],
     };
+  },
+  created: function() {
+    call_api({
+      path: "tiles/",
+      method: "GET",
+    }).then(resp => {
+      this.tiles = resp;
+    });
   },
 };
 </script>

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'corsheaders',
 
     'overthrow.users',
+    'overthrow.games',
 ]
 
 MIDDLEWARE = [
