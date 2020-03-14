@@ -70,15 +70,21 @@ export default {
         this.update_border(coord_sum(tile, delta), coord_negative(delta));
       });
     },
+
     update_border: function(tile, delta) {
       const tile_id = get_tile_coord_id(tile);
       const neighbour_id = get_tile_coord_id(coord_sum(tile, delta));
+
+      // nonexistent tile
       if (!(tile_id in this.tiles)) return;
-      let show_border = true;
+
+      let show_border = false;
       if (neighbour_id in this.tiles) {
         show_border =
-          this.tiles[tile_id].owner != this.tiles[neighbour_id].owner;
+          this.tiles[tile_id].owner !== this.tiles[neighbour_id].owner &&
+          this.tiles[tile_id].owner !== null;
       }
+
       Vue.set(
         this.tiles[tile_id].borders,
         get_tile_coord_id(delta),

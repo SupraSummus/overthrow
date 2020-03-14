@@ -6,6 +6,11 @@ from django.contrib.auth import get_user_model
 from overthrow.utils import UUIDModel
 
 
+def coord_distance(a, b):
+    """ distance in cube coordinates. """
+    return max(map(lambda v: abs(v[0] - v[1]), zip(a, b)))
+
+
 class Game(UUIDModel):
     @staticmethod
     @transaction.atomic
@@ -25,6 +30,11 @@ class Game(UUIDModel):
         Tile.objects.bulk_create(tiles)
         return game
 
+    def create_player(self, user):
+        player = Player.objects.create(game=self, user=user)
+        player.grant_initial_tiles(tile_count=10, army=10)
+        return player
+
 
 class Player(UUIDModel):
     game = models.ForeignKey(
@@ -42,6 +52,32 @@ class Player(UUIDModel):
         constraints = [
             models.UniqueConstraint(fields=['game', 'user'], name='unique_player'),
         ]
+
+    @transaction.atomic
+    def grant_initial_tiles(self, tile_count, army):
+        free_tiles = self.game.tiles.filter(owner=None).select_for_update()
+
+        # select tile nearest to origin
+        nearest_to_origin = sorted(
+            free_tiles,
+            key=lambda tile: coord_distance(tile.coords, (0, 0, 0)),
+        )
+        if not nearest_to_origin:
+            return []
+        initial = nearest_to_origin[0]
+
+        # select tiles nearest to initial tile
+        granted_tiles = sorted(
+            free_tiles,
+            key=lambda tile: coord_distance(tile.coords, initial.coords),
+        )[:tile_count]
+
+        # set ownership
+        for tile in granted_tiles:
+            tile.owner = self
+            tile.army = army
+        Tile.objects.bulk_update(granted_tiles, ['owner', 'army'])
+        return granted_tiles
 
 
 class Tile(UUIDModel):
@@ -75,3 +111,7 @@ class Tile(UUIDModel):
 
     def __str__(self):
         return f'{self.x}, {self.y}, {self.z}'
+
+    @property
+    def coords(self):
+        return (self.x, self.y, self.z)
