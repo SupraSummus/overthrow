@@ -1,10 +1,16 @@
 <template>
   <div>
-    <nav>
-      <router-link :to="{ name: 'map' }">a map</router-link>
-      <login v-if="!$store.getters.is_logged_in" />
-      <logout v-if="$store.getters.is_logged_in" />
+    <login v-if="!$store.getters.is_logged_in" />
+
+    <nav class="navbar" v-if="$store.getters.is_logged_in">
+      <div class="navbar-item">
+        <router-link :to="{ name: 'map' }">a map</router-link>
+      </div>
+      <div class="navbar-item">
+        <logout />
+      </div>
     </nav>
+
     <router-view></router-view>
   </div>
 </template>
@@ -20,3 +26,13 @@ export default {
   },
 };
 </script>
+
+<style scoped lang="scss">
+.navbar {
+  background-color: white;
+}
+.navbar-item {
+  display: inline-block;
+  margin: 0 4rem;
+}
+</style>

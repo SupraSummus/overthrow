@@ -1,6 +1,5 @@
 <template>
   <div>
-    hex grid
     <div class="grid-container">
       <panZoom selector=".grid" :options="{ bounds: false }">
         <div class="grid">
@@ -92,10 +91,14 @@ export default {
 
 <style scoped>
 .grid-container {
-  border: 1px solid black;
+  position: fixed;
+  z-index: -1;
+  border: 0;
   overflow: hidden;
-  width: 90vw;
-  height: 80vh;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
 }
 .grid {
   position: relative;

@@ -1,8 +1,10 @@
 <template>
   <div>
     <form @submit.prevent="logout">
-      <p>Logged in as {{ $store.state.auth.username }}</p>
-      <button type="submit">Logout</button>
+      <p>
+        Logged in as {{ $store.state.auth.username }}
+        <button type="submit">Logout</button>
+      </p>
     </form>
   </div>
 </template>
