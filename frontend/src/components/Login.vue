@@ -37,7 +37,9 @@ export default {
       this.message = "logging in ...";
       this.$store
         .dispatch("login", { username: this.username, password: this.password })
-        .then(() => this.$router.push("/map"))
+        .then(() =>
+          this.$router.push({ name: "game", params: { id: "default" } }),
+        )
         .catch(() => {
           this.message = "failed to login";
         });

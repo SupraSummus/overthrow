@@ -2,7 +2,7 @@
   <div>
     <form @submit.prevent="logout">
       <p>
-        Logged in as {{ $store.state.auth.username }}
+        Logged in as {{ $store.state.user.username }}
         <button type="submit">Logout</button>
       </p>
     </form>

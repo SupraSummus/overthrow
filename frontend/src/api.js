@@ -5,8 +5,8 @@ const api_url = `${window.location.protocol}//${window.location.hostname}:${api_
 
 const call_api = ({ method, path, payload }) => {
   const headers = { "Content-Type": "application/json" };
-  if (store.state.auth.token) {
-    headers["Authorization"] = "Token " + store.state.auth.token;
+  if (store.state.auth_token) {
+    headers["Authorization"] = "Token " + store.state.auth_token;
   }
   return fetch(api_url + path, {
     method,

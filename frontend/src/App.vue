@@ -4,7 +4,9 @@
 
     <nav class="navbar" v-if="$store.getters.is_logged_in">
       <div class="navbar-item">
-        <router-link :to="{ name: 'map' }">a map</router-link>
+        <router-link :to="{ name: 'game', params: { id: 'default' } }"
+          >a map</router-link
+        >
       </div>
       <div class="navbar-item">
         <logout />

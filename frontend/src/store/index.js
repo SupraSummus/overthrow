@@ -7,25 +7,23 @@ Vue.use(Vuex);
 
 const store = new Vuex.Store({
   state: {
-    auth: {
-      token: localStorage.getItem("auth_token") || null,
-      username: localStorage.getItem("auth_username") || null,
-    },
+    auth_token: localStorage.getItem("auth_token") || null,
+    user: {},
   },
   mutations: {
-    logged_in(state, { token, username }) {
-      state.auth.token = token;
-      state.auth.username = username;
+    logged_in(state, { token }) {
+      state.auth_token = token;
       localStorage.setItem("auth_token", token);
-      localStorage.setItem("auth_username", username);
     },
     logged_out(state) {
-      state.auth.token = null;
-      state.auth.username = null;
+      state.auth_token = null;
       localStorage.removeItem("auth_token");
-      localStorage.removeItem("auth_username");
+    },
+    user_info_fethced(state, user) {
+      state.user = user;
     },
   },
+
   actions: {
     login({ commit }, { username, password }) {
       return new Promise((resolve, reject) => {
@@ -35,7 +33,8 @@ const store = new Vuex.Store({
           payload: { username, password },
         })
           .then(resp => {
-            commit("logged_in", { token: resp.token, username });
+            commit("logged_in", { token: resp.token });
+            store.dispatch("fetch_user_info");
             resolve(resp);
           })
           .catch(err => {
@@ -43,10 +42,26 @@ const store = new Vuex.Store({
           });
       });
     },
+
+    fetch_user_info({ commit }) {
+      return new Promise((resolve, reject) => {
+        call_api({
+          path: "user/",
+          method: "GET",
+        })
+          .then(resp => {
+            commit("user_info_fethced", resp);
+            resolve(resp);
+          })
+          .catch(err => reject(err));
+      });
+    },
   },
   getters: {
-    is_logged_in: state => !!state.auth.token,
+    is_logged_in: state => !!state.auth_token,
   },
 });
 
 export default store;
+
+store.dispatch("fetch_user_info");

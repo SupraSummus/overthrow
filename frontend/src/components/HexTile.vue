@@ -2,6 +2,7 @@
   <div class="tile" :style="position_style">
     <div class="tile_content">
       <div class="tile_army">{{ tile.army }}</div>
+      <div v-if="owned">owned</div>
       <div class="tile_coords">{{ tile.x }} / {{ tile.y }} / {{ tile.z }}</div>
     </div>
     <div
@@ -24,7 +25,7 @@ const tile_height = (tile_size / Math.sqrt(3)) * 2; //px
 const border_spacing = 5; //px
 
 export default {
-  props: ["tile"],
+  props: ["tile", "players"],
   data: function() {
     return { tile_size, border_spacing };
   },
@@ -41,6 +42,13 @@ export default {
         if (this.tile.borders[border_id]) visible_borders.push(border_id);
       }
       return visible_borders;
+    },
+    owned: function() {
+      if (this.tile.owner === null) {
+        return false;
+      } else {
+        return this.players[this.tile.owner].user == this.$store.state.user.id;
+      }
     },
   },
   methods: {

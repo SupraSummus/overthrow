@@ -7,6 +7,7 @@
             v-for="(tile, tile_coord_id) in tiles"
             v-bind:key="tile_coord_id"
             v-bind:tile="tile"
+            v-bind:players="players"
           >
           </hex-tile>
         </div>
@@ -46,18 +47,28 @@ export default {
   components: {
     HexTile,
   },
+  props: ["id"],
   data: () => {
     return {
+      players: {},
       tiles: {},
     };
   },
   created: function() {
     call_api({
-      path: "tiles/",
+      path: `game/${this.id}/tiles/`,
       method: "GET",
     }).then(resp => {
       resp.forEach(tile => {
         this.set_tile(tile);
+      });
+    });
+    call_api({
+      path: `game/${this.id}/players/`,
+      method: "GET",
+    }).then(resp => {
+      resp.forEach(player => {
+        Vue.set(this.players, player.id, player);
       });
     });
   },
