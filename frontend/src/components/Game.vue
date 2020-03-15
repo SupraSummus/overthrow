@@ -1,15 +1,25 @@
 <template>
   <div>
     <div class="grid-container">
-      <panZoom selector=".grid" :options="{ bounds: false }">
+      <panZoom
+        selector=".grid"
+        :options="{
+          bounds: false,
+          onTouch: function() {
+            // returning false causes panzoom to propagate events down
+            return false;
+          },
+        }"
+      >
         <div class="grid">
-          <hex-tile
+          <map-tile
             v-for="(tile, tile_coord_id) in tiles"
             v-bind:key="tile_coord_id"
             v-bind:tile="tile"
             v-bind:players="players"
+            v-bind:game="game"
           >
-          </hex-tile>
+          </map-tile>
         </div>
       </panZoom>
     </div>
@@ -19,8 +29,8 @@
 <script>
 import Vue from "vue";
 
-import HexTile from "./HexTile.vue";
-import call_api from "../api";
+import MapTile from "./MapTile.vue";
+import call_api from "@/api";
 
 const coord_neighbour_deltas = [
   { x: -1, y: 0, z: 1 },
@@ -45,13 +55,16 @@ function get_tile_coord_id(coords) {
 
 export default {
   components: {
-    HexTile,
+    MapTile,
   },
   props: ["id"],
   data: () => {
     return {
       players: {},
       tiles: {},
+      game: {
+        selected_tile: null,
+      },
     };
   },
   created: function() {
@@ -106,11 +119,10 @@ export default {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .grid-container {
   position: fixed;
   z-index: -1;
-  border: 0;
   overflow: hidden;
   top: 0;
   left: 0;

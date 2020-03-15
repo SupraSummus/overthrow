@@ -1,21 +1,27 @@
 <template>
-  <div class="tile" :style="position_style">
-    <div class="tile_content">
-      <div class="tile_army">{{ tile.army }}</div>
-      <div v-if="owned">owned</div>
-      <div class="tile_coords">{{ tile.x }} / {{ tile.y }} / {{ tile.z }}</div>
-    </div>
+  <div class="tile" v-bind:style="position_style">
     <div
-      class="tile_border"
+      class="tile-content"
+      v-on:click="click"
+      v-bind:class="{ selected: selected }"
+    >
+      <div class="tile-army">{{ tile.army }}</div>
+      <div v-if="owned">owned</div>
+      <div class="tile-coords">{{ tile.x }} / {{ tile.y }} / {{ tile.z }}</div>
+    </div>
+
+    <!-- borders -->
+    <div
+      class="tile-border"
       v-for="border_id in visible_borders"
       v-bind:key="border_id"
       v-bind:style="{
         color: 'blue',
         transform: `rotate(${get_border_rotation(
           border_id,
-        )}) translateY(${-tile_size / 2 + border_spacing}px) `,
+        )}) translateY(${-tile_size / 2 + border_spacing}px)`,
       }"
-    ></div>
+    />
   </div>
 </template>
 
@@ -25,7 +31,7 @@ const tile_height = (tile_size / Math.sqrt(3)) * 2; //px
 const border_spacing = 5; //px
 
 export default {
-  props: ["tile", "players"],
+  props: ["tile", "players", "game"],
   data: function() {
     return { tile_size, border_spacing };
   },
@@ -44,11 +50,17 @@ export default {
       return visible_borders;
     },
     owned: function() {
-      if (this.tile.owner === null) {
+      if (!(this.tile.owner in this.players)) {
         return false;
       } else {
         return this.players[this.tile.owner].user == this.$store.state.user.id;
       }
+    },
+    id: function() {
+      return this.tile.id;
+    },
+    selected: function() {
+      return this.game.selected_tile == this.id;
     },
   },
   methods: {
@@ -61,6 +73,9 @@ export default {
         "1_-1_0": "30deg",
         "1_0_-1": "90deg",
       }[border_id];
+    },
+    click: function() {
+      this.game.selected_tile = this.id;
     },
   },
 };
@@ -81,24 +96,34 @@ $border-width: $tile-side - $border-spacing * 2;
   height: $tile-height;
 }
 
-.tile_content {
-  margin: 0;
+.tile-content {
+  // center in parent container
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+
+  // center content
   text-align: center;
+
+  padding: 0.5rem;
+  border-radius: 1rem;
+  transition: background-color 0.5s ease;
+
+  &.selected {
+    background-color: lightgray;
+  }
 }
 
-.tile_army {
+.tile-army {
   font-size: 40px;
 }
 
-.tile_coords {
+.tile-coords {
   font-size: 5px;
 }
 
-.tile_border {
+.tile-border {
   border-width: 0;
   border-bottom: 2px dashed;
   width: $border-width;
