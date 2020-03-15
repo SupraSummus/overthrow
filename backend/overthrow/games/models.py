@@ -1,7 +1,10 @@
 import itertools
 
 from django.db import models, transaction
+from django.db.models import Q, F
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 from overthrow.utils import UUIDModel
 
@@ -115,3 +118,33 @@ class Tile(UUIDModel):
     @property
     def coords(self):
         return (self.x, self.y, self.z)
+
+
+class Movement(UUIDModel):
+    source = models.ForeignKey(
+        Tile,
+        on_delete=models.CASCADE,
+        related_name='outgoing_movements',
+    )
+    target = models.ForeignKey(
+        Tile,
+        on_delete=models.CASCADE,
+        related_name='incoming_movements'
+    )
+    amount = models.PositiveIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['source', 'target'], name='unique_path'),
+            models.CheckConstraint(check=Q(amount__gte=1), name='nonempty_amount'),
+            models.CheckConstraint(
+                check=~Q(source=F('target')),
+                name='nonempty_distance',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+
+        if self.source.game_id != self.target.game_id:
+            raise ValidationError(_('Source and target have to be tiles in the same game.'))

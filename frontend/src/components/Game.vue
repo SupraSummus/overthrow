@@ -1,5 +1,6 @@
 <template>
   <div>
+    <div>player_id: {{ player_id }}</div>
     <div class="grid-container">
       <panZoom
         selector=".grid"
@@ -13,11 +14,10 @@
       >
         <div class="grid">
           <map-tile
-            v-for="(tile, tile_coord_id) in tiles"
-            v-bind:key="tile_coord_id"
-            v-bind:tile="tile"
-            v-bind:players="players"
-            v-bind:game="game"
+            v-for="(tile, tile_id) in tiles"
+            v-bind:key="tile_id"
+            v-bind="tile"
+            v-on:select="select_tile(tile.id)"
           >
           </map-tile>
         </div>
@@ -60,12 +60,21 @@ export default {
   props: ["id"],
   data: () => {
     return {
-      players: {},
-      tiles: {},
-      game: {
-        selected_tile: null,
-      },
+      players: {}, // player id -> player
+      tiles: {}, // tile id -> tile
+      tile_ids_by_coord: {}, // tile coord string -> tile id
+      selected_tile_id: "",
+      movements: {}, // movement id > movement
     };
+  },
+  computed: {
+    player_id: function() {
+      const user_id = this.$store.state.user.id;
+      for (let player_id in this.players) {
+        if (this.players[player_id].user == user_id) return player_id;
+      }
+      return "";
+    },
   },
   created: function() {
     call_api({
@@ -88,7 +97,10 @@ export default {
   methods: {
     set_tile: function(tile) {
       tile.borders = {};
-      Vue.set(this.tiles, get_tile_coord_id(tile), tile);
+      tile.selected = tile.id == this.selected_tile_id;
+      tile.owned = tile.owner == this.player_id;
+      Vue.set(this.tiles, tile.id, tile);
+      Vue.set(this.tile_ids_by_coord, get_tile_coord_id(tile), tile.id);
       coord_neighbour_deltas.forEach(delta => {
         this.update_border(tile, delta);
         this.update_border(coord_sum(tile, delta), coord_negative(delta));
@@ -96,14 +108,18 @@ export default {
     },
 
     update_border: function(tile, delta) {
-      const tile_id = get_tile_coord_id(tile);
-      const neighbour_id = get_tile_coord_id(coord_sum(tile, delta));
+      const tile_coord_id = get_tile_coord_id(tile);
+      if (!(tile_coord_id in this.tile_ids_by_coord)) {
+        // nonexistent tile
+        return;
+      }
+      const tile_id = this.tile_ids_by_coord[tile_coord_id];
 
-      // nonexistent tile
-      if (!(tile_id in this.tiles)) return;
+      const neighbour_coord_id = get_tile_coord_id(coord_sum(tile, delta));
 
       let show_border = false;
-      if (neighbour_id in this.tiles) {
+      if (neighbour_coord_id in this.tile_ids_by_coord) {
+        const neighbour_id = this.tile_ids_by_coord[neighbour_coord_id];
         show_border =
           this.tiles[tile_id].owner !== this.tiles[neighbour_id].owner &&
           this.tiles[tile_id].owner !== null;
@@ -114,6 +130,60 @@ export default {
         get_tile_coord_id(delta),
         show_border,
       );
+    },
+
+    add_movement: function(movement) {
+      Vue.set(this.movements, movement.id, movement);
+    },
+
+    select_tile: function(tile_id) {
+      if (!this.selected_tile_id) {
+        // nothing was selected -> select this
+        this.selected_tile_id = tile_id;
+      } else if (this.selected_tile_id == tile_id) {
+        // unselect selected
+        this.selected_tile_id = "";
+      } else if (!this.tiles[this.selected_tile_id].owned) {
+        // selected foreign tile -> change selection to this
+        this.selected_tile_id = tile_id;
+      } else {
+        // selected own tile -> command movement to this tile
+        call_api({
+          method: "POST",
+          path: `tile/${this.selected_tile_id}/move/`,
+          payload: {
+            target: tile_id,
+            amount: this.tiles[this.selected_tile_id].army,
+          },
+        }).then(movement => console.log(movement));
+      }
+    },
+  },
+  watch: {
+    selected_tile_id: function(after_id, before_id) {
+      if (before_id in this.tiles) this.tiles[before_id].selected = false;
+      if (after_id in this.tiles) this.tiles[after_id].selected = true;
+    },
+    player_id: function(player_id) {
+      for (let tile_id in this.tiles) {
+        this.tiles[tile_id].owned = this.tiles[tile_id].owner == player_id;
+      }
+    },
+    id: {
+      immediate: true,
+      handler(game_id) {
+        call_api({
+          method: "GET",
+          path: `game/${game_id}/movements/`,
+        }).then(movements => {
+          for (let movement_id in this.movements)
+            delete this.movements[movement_id];
+          movements.forEach(movement => this.add_movement(movement));
+        });
+      },
+    },
+    movements: function(after, before) {
+      console.log(after, before);
     },
   },
 };

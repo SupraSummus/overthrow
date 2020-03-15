@@ -2,12 +2,12 @@
   <div class="tile" v-bind:style="position_style">
     <div
       class="tile-content"
-      v-on:click="click"
+      v-on:click="$emit('select')"
       v-bind:class="{ selected: selected }"
     >
-      <div class="tile-army">{{ tile.army }}</div>
+      <div class="tile-army">{{ army }}</div>
       <div v-if="owned">owned</div>
-      <div class="tile-coords">{{ tile.x }} / {{ tile.y }} / {{ tile.z }}</div>
+      <div class="tile-coords">{{ x }} / {{ y }} / {{ z }}</div>
     </div>
 
     <!-- borders -->
@@ -31,36 +31,23 @@ const tile_height = (tile_size / Math.sqrt(3)) * 2; //px
 const border_spacing = 5; //px
 
 export default {
-  props: ["tile", "players", "game"],
+  props: ["x", "y", "z", "army", "selected", "borders", "owned"],
   data: function() {
     return { tile_size, border_spacing };
   },
   computed: {
     position_style: function() {
       return {
-        top: this.tile.y * tile_height * 0.75 - tile_height / 2 + "px",
-        left: (this.tile.x + this.tile.y / 2 - 0.5) * tile_size + "px",
+        top: this.y * tile_height * 0.75 - tile_height / 2 + "px",
+        left: (this.x + this.y / 2 - 0.5) * tile_size + "px",
       };
     },
     visible_borders: function() {
       let visible_borders = [];
-      for (let border_id in this.tile.borders) {
-        if (this.tile.borders[border_id]) visible_borders.push(border_id);
+      for (let border_id in this.borders) {
+        if (this.borders[border_id]) visible_borders.push(border_id);
       }
       return visible_borders;
-    },
-    owned: function() {
-      if (!(this.tile.owner in this.players)) {
-        return false;
-      } else {
-        return this.players[this.tile.owner].user == this.$store.state.user.id;
-      }
-    },
-    id: function() {
-      return this.tile.id;
-    },
-    selected: function() {
-      return this.game.selected_tile == this.id;
     },
   },
   methods: {
@@ -73,9 +60,6 @@ export default {
         "1_-1_0": "30deg",
         "1_0_-1": "90deg",
       }[border_id];
-    },
-    click: function() {
-      this.game.selected_tile = this.id;
     },
   },
 };

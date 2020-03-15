@@ -18,6 +18,7 @@ const store = new Vuex.Store({
     logged_out(state) {
       state.auth_token = null;
       localStorage.removeItem("auth_token");
+      store.dispatch("fetch_user_info"); // welp, this probably shuda be in actions
     },
     user_info_fethced(state, user) {
       state.user = user;
