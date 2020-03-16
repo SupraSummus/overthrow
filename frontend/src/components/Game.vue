@@ -95,12 +95,27 @@ export default {
     });
   },
   methods: {
-    set_tile: function(tile) {
-      tile.borders = {};
+    get_or_create_tile: function (id) {
+      if (!(id in this.tiles)) {
+        this.tiles[id] = {id: id};
+      }
+      return this.tiles[id];
+    }
+    set_tile: function(tile_data) {
+      const tile = this.get_or_create_tile(tile_data.id);
+
+      const coord_string = get_tile_coord_id(tile_data);
+      this.tile_ids_by_coord[coord_stirng] = id;
+
+      // copy tile data into tile
+      Object.assign(tile, tile_data);
+
+      // computed properties
       tile.selected = tile.id == this.selected_tile_id;
       tile.owned = tile.owner == this.player_id;
-      Vue.set(this.tiles, tile.id, tile);
-      Vue.set(this.tile_ids_by_coord, get_tile_coord_id(tile), tile.id);
+
+      // compute borders
+      tile.borders = {};
       coord_neighbour_deltas.forEach(delta => {
         this.update_border(tile, delta);
         this.update_border(coord_sum(tile, delta), coord_negative(delta));
@@ -132,8 +147,22 @@ export default {
       );
     },
 
-    add_movement: function(movement) {
-      Vue.set(this.movements, movement.id, movement);
+    set_movement: function({ id, source, target, amount }) {
+      if (!(id in this.movements)) this.movements[id] = {id: id};
+      const movement= this.movements[id];
+
+      if (movement.source != source) {
+        if (movement.source){
+          delete this.tiles[movement.source].outgoing_movements[movement.id];
+        }
+        movement.source = source;
+        if (movement.source) {
+          this.get_or_create_tile(movement.source).outgoing_movements[movement.id] = movement;
+        }
+      }
+
+      movement.target = target;
+      movement.amount = amount;
     },
 
     select_tile: function(tile_id) {
@@ -181,9 +210,6 @@ export default {
           movements.forEach(movement => this.add_movement(movement));
         });
       },
-    },
-    movements: function(after, before) {
-      console.log(after, before);
     },
   },
 };
