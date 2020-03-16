@@ -9,6 +9,5 @@ class Command(BaseCommand):
         parser.add_argument('radius', type=int)
 
     def handle(self, radius, **kwargs):
-        print(kwargs)
         game = Game.generate_hexagonal(radius)
         print(game.id)

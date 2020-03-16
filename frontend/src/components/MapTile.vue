@@ -13,7 +13,7 @@
     <!-- borders -->
     <div
       class="tile-border"
-      v-for="border_id in visible_borders"
+      v-for="border_id in borders"
       v-bind:key="border_id"
       v-bind:style="{
         color: 'blue',
@@ -41,13 +41,6 @@ export default {
         top: this.y * tile_height * 0.75 - tile_height / 2 + "px",
         left: (this.x + this.y / 2 - 0.5) * tile_size + "px",
       };
-    },
-    visible_borders: function() {
-      let visible_borders = [];
-      for (let border_id in this.borders) {
-        if (this.borders[border_id]) visible_borders.push(border_id);
-      }
-      return visible_borders;
     },
   },
   methods: {
