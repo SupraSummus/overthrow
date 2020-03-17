@@ -11,12 +11,6 @@
             return false;
           },
         }"
-        @zoom="
-          console.log('zoom');
-          $nextTick(() => {
-            if ($refs.move_menu_slider) $refs.move_menu_slider.refresh();
-          });
-        "
       >
         <div class="grid">
           <map-tile
@@ -44,15 +38,13 @@
 
           <!-- movement command context menu -->
           <context-dialog v-if="move_menu_tile" v-bind="move_menu_tile">
-            <vue-slider
+            <v-slider
               ref="move_menu_slider"
               :value="0"
-              :adsorb="true"
-              :interval="1"
+              :step="1"
               :min="0"
               :max="selected_tile.army"
-              :lazy="true"
-              :marks="true"
+              :ticks="true"
               @change="move"
               @mousedown.native.stop
             />
@@ -98,9 +90,6 @@ export default {
       hovered_tile: null,
       move_menu_tile: null,
       move_amount: 0,
-
-      //debug
-      console: window.console,
     };
   },
   computed: {
@@ -246,7 +235,6 @@ export default {
     },
 
     move: function(amount) {
-      console.log("move", amount);
       if (amount != 0) {
         call_api({
           method: "POST",
@@ -342,7 +330,6 @@ export default {
 <style scoped lang="scss">
 .grid-container {
   position: fixed;
-  z-index: -1;
   overflow: hidden;
   top: 0;
   left: 0;
