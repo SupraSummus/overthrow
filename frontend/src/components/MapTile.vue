@@ -6,7 +6,7 @@
       v-bind:class="{ selected: selected }"
     >
       <div class="tile-army">{{ army }}</div>
-      <div v-if="owned">owned</div>
+      <div class="tile-coords" v-if="owned">owned</div>
       <div class="tile-coords">{{ x }} / {{ y }} / {{ z }}</div>
     </div>
 
@@ -26,8 +26,8 @@
 </template>
 
 <script>
-const tile_size = 100; // px
-const tile_height = (tile_size / Math.sqrt(3)) * 2; //px
+import { delta_rotations, tile_size, tile_height } from "@/constants";
+
 const border_spacing = 5; //px
 
 export default {
@@ -45,14 +45,7 @@ export default {
   },
   methods: {
     get_border_rotation: function(border_id) {
-      return {
-        "-1_0_1": "270deg",
-        "-1_1_0": "210deg",
-        "0_-1_1": "330deg",
-        "0_1_-1": "150deg",
-        "1_-1_0": "30deg",
-        "1_0_-1": "90deg",
-      }[border_id];
+      return delta_rotations[border_id] + "deg";
     },
   },
 };
@@ -84,16 +77,19 @@ $border-width: $tile-side - $border-spacing * 2;
   text-align: center;
 
   padding: 0.5rem;
-  border-radius: 1rem;
+  border-radius: 10rem;
   transition: background-color 0.5s ease;
 
   &.selected {
     background-color: lightgray;
   }
+
+  cursor: pointer;
 }
 
 .tile-army {
-  font-size: 40px;
+  font-weight: bold;
+  font-size: 30px;
 }
 
 .tile-coords {

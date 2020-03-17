@@ -1,9 +1,9 @@
-from rest_framework import generics, permissions
+from rest_framework import generics
 from django.shortcuts import get_object_or_404
 from django.utils.functional import cached_property
 
 from .models import Game, Tile, Movement
-from . import serializers
+from . import serializers, permissions
 
 
 class GameViewMixin:
@@ -37,15 +37,8 @@ class TileViewMixin:
         return get_object_or_404(Tile, id=self.kwargs['id'])
 
 
-class TileCommandPermission(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if not obj.owner:
-            return False
-        return request.user == obj.owner.user
-
-
 class MoveAPIView(TileViewMixin, generics.CreateAPIView):
-    permission_classes = [TileCommandPermission]
+    permission_classes = [permissions.TileCommandPermission]
     serializer_class = serializers.MovementSerializer
 
     def post(self, request, *args, **kwargs):
@@ -54,6 +47,15 @@ class MoveAPIView(TileViewMixin, generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(source=self.tile)
+
+
+class MovementDeleteAPIView(generics.DestroyAPIView):
+    permission_classes = [permissions.MovementCommandPermission]
+
+    def get_object(self):
+        movement = get_object_or_404(Movement, id=self.kwargs['id'])
+        self.check_object_permissions(self.request, movement)
+        return movement
 
 
 class MoveListAPIView(GameViewMixin, generics.ListAPIView):

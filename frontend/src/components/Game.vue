@@ -23,6 +23,7 @@
             v-for="(movement, movement_id) in movements"
             v-bind:key="movement_id"
             v-bind="movement"
+            v-on:delete="delete_movement(movement_id)"
           />
         </div>
       </panZoom>
@@ -160,6 +161,7 @@ export default {
           source: null,
           target: null,
           amount: null,
+          processing: false,
         });
       }
       const movement = this.movements[id];
@@ -178,10 +180,14 @@ export default {
 
     delete_movement: function(id) {
       const movement = this.movements[id];
-      if (movement.source) {
-        delete this.tiles[movement.source].outgoing_movements[id];
-      }
-      delete this.movements[id];
+      movement.processing = true;
+      call_api({
+        method: "DELETE",
+        path: `movement/${id}/`,
+      }).then(() => {
+        Vue.delete(movement.source.outgoing_movements, id);
+        Vue.delete(this.movements, id);
+      });
     },
 
     select_tile: function(tile_id) {

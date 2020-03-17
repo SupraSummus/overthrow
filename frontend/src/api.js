@@ -13,6 +13,9 @@ const call_api = ({ method, path, payload }) => {
     headers,
     body: JSON.stringify(payload),
   }).then(response => {
+    // no content
+    if (response.status == 204) return null;
+
     if (response.ok) {
       return response.json();
     } else if (response.status >= 400 && response.status < 500) {
