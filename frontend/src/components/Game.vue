@@ -11,14 +11,21 @@
             return false;
           },
         }"
+        @zoom="
+          console.log('zoom');
+          $nextTick(() => {
+            if ($refs.move_menu_slider) $refs.move_menu_slider.refresh();
+          });
+        "
       >
         <div class="grid">
           <map-tile
             v-for="(tile, tile_id) in tiles"
             v-bind:key="tile_id"
             v-bind="tile"
-            v-on:select="select_tile(tile.id)"
-            v-on:hover="hover_tile = tile"
+            v-on:select="on_select_tile(tile)"
+            v-on:hover="on_hover_tile(tile)"
+            v-on:contextmenu.native.prevent="on_contextmenu_tile(tile)"
           />
           <movement-chain
             v-for="(movement, movement_id) in movements"
@@ -29,11 +36,27 @@
 
           <!-- hover path -->
           <movement-chain
-            v-if="selected_tile && selected_tile.owned && hover_tile"
+            v-if="selected_tile && selected_tile.owned && hovered_tile"
             v-bind:source="selected_tile"
-            v-bind:target="hover_tile"
+            v-bind:target="hovered_tile"
             v-bind:amount="null"
           />
+
+          <!-- movement command context menu -->
+          <context-dialog v-if="move_menu_tile" v-bind="move_menu_tile">
+            <vue-slider
+              ref="move_menu_slider"
+              :value="0"
+              :adsorb="true"
+              :interval="1"
+              :min="0"
+              :max="selected_tile.army"
+              :lazy="true"
+              :marks="true"
+              @change="move"
+              @mousedown.native.stop
+            />
+          </context-dialog>
         </div>
       </panZoom>
     </div>
@@ -45,6 +68,7 @@ import Vue from "vue";
 
 import MapTile from "./MapTile.vue";
 import MovementChain from "./MovementChain.vue";
+import ContextDialog from "./context_dialog.vue";
 import call_api from "@/api";
 import {
   coord_string as get_tile_coord_id,
@@ -57,16 +81,26 @@ export default {
   components: {
     MapTile,
     MovementChain,
+    ContextDialog,
   },
   props: ["id"],
   data: () => {
     return {
       players: {}, // player id -> player
       tiles: {}, // tile id -> tile
-      tile_ids_by_coord: {}, // tile coord string -> tile id
-      selected_tile_id: null,
-      hover_tile: null,
       movements: {}, // movement id > movement
+
+      // indexes
+      tile_ids_by_coord: {}, // tile coord string -> tile id
+
+      // UI state
+      selected_tile_id: null,
+      hovered_tile: null,
+      move_menu_tile: null,
+      move_amount: 0,
+
+      //debug
+      console: window.console,
     };
   },
   computed: {
@@ -211,11 +245,42 @@ export default {
       });
     },
 
-    select_tile: function(tile_id) {
+    move: function(amount) {
+      console.log("move", amount);
+      if (amount != 0) {
+        call_api({
+          method: "POST",
+          path: `tile/${this.selected_tile.id}/move/`,
+          payload: {
+            target: this.hovered_tile.id,
+            amount: amount,
+          },
+        }).then(movement => this.load_movement(movement));
+      }
+
+      this.selected_tile_id = null;
+      this.hovered_tile = null;
+      this.move_menu_tile = null;
+    },
+
+    on_select_tile: function(tile) {
+      const tile_id = tile.id;
+
+      if (this.move_menu_tile) {
+        // clickaway from contextment
+        this.move_menu_tile = null;
+        this.selected_tile_id = tile_id;
+        this.hovered_tile = tile;
+        return;
+      }
+
       if (!this.selected_tile_id) {
         // nothing was selected -> select this
         this.selected_tile_id = tile_id;
-      } else if (this.selected_tile_id == tile_id) {
+        return;
+      }
+
+      if (this.selected_tile_id == tile_id) {
         // unselect selected
         this.selected_tile_id = null;
       } else if (!this.tiles[this.selected_tile_id].owned) {
@@ -223,18 +288,30 @@ export default {
         this.selected_tile_id = tile_id;
       } else {
         // selected own tile -> command movement to this tile
-        call_api({
-          method: "POST",
-          path: `tile/${this.selected_tile_id}/move/`,
-          payload: {
-            target: tile_id,
-            amount: this.tiles[this.selected_tile_id].army,
-          },
-        }).then(movement => this.load_movement(movement));
-        this.selected_tile_id = null;
+        this.move(this.selected_tile.army);
+      }
+    },
+
+    on_hover_tile: function(tile) {
+      if (!this.move_menu_tile) {
+        // no hover when contextmenu is enabled
+        this.hovered_tile = tile;
+      }
+    },
+
+    on_contextmenu_tile: function(tile) {
+      // open move contextmenu
+      if (
+        this.selected_tile &&
+        this.selected_tile.id != tile.id &&
+        this.selected_tile.owned
+      ) {
+        this.move_menu_tile = tile;
+        this.hovered_tile = tile;
       }
     },
   },
+
   watch: {
     selected_tile_id: function(after_id, before_id) {
       if (before_id in this.tiles) this.tiles[before_id].selected = false;
