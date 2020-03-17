@@ -1,11 +1,9 @@
 <template>
   <div
-    v-if="show"
     class="movement"
     v-bind:style="{
       transform: this.position_transform,
     }"
-    v-on:click="$emit('delete')"
   >
     <div class="movement-content">
       {{ amount }}
@@ -13,20 +11,20 @@
     <div
       class="movement-arrow"
       v-bind:style="{
-        transform: `translate(-50%, -50%) rotate(${this.rotation + 90}deg)`,
+        transform: `translate(-50%, -50%) rotate(${this.rotation - 90}deg)`,
       }"
     >
-      &lt;
+      ⇨
     </div>
   </div>
 </template>
 
 <script>
-import { coord_delta_one, coord_string } from "@/coord";
+import { coord_string } from "@/coord";
 import { tile_height, tile_width, delta_rotations } from "@/constants";
 
 export default {
-  props: ["source", "target", "amount", "show"],
+  props: ["source", "delta", "amount"],
   computed: {
     top: function() {
       return (this.source.y + this.delta.y / 2) * tile_height * 0.75 + "px";
@@ -47,9 +45,6 @@ export default {
     rotation: function() {
       return delta_rotations[coord_string(this.delta)];
     },
-    delta: function() {
-      return coord_delta_one(this.source, this.target);
-    },
   },
 };
 </script>
@@ -62,6 +57,7 @@ export default {
 }
 .movement-content,
 .movement-arrow {
+  font-weight: bold;
   position: absolute;
   top: 50%;
   left: 50%;
@@ -69,9 +65,8 @@ export default {
   cursor: pointer;
 }
 .movement-arrow {
-  font-weight: bold;
+  font-size: 60px;
   color: lightgray;
   z-index: -1;
-  font-size: 50px;
 }
 </style>

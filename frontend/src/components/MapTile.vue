@@ -3,9 +3,10 @@
     <div
       class="tile-content"
       v-on:click="$emit('select')"
+      v-on:mouseover="$emit('hover')"
       v-bind:class="{ selected: selected }"
     >
-      <div class="tile-army">{{ army }}</div>
+      <div class="tile-army">{{ army_without_outgoing }}</div>
       <div class="tile-coords" v-if="owned">owned</div>
       <div class="tile-coords">{{ x }} / {{ y }} / {{ z }}</div>
     </div>
@@ -31,7 +32,16 @@ import { delta_rotations, tile_size, tile_height } from "@/constants";
 const border_spacing = 5; //px
 
 export default {
-  props: ["x", "y", "z", "army", "selected", "borders", "owned"],
+  props: [
+    "x",
+    "y",
+    "z",
+    "army",
+    "selected",
+    "borders",
+    "owned",
+    "outgoing_movements",
+  ],
   data: function() {
     return { tile_size, border_spacing };
   },
@@ -41,6 +51,12 @@ export default {
         top: this.y * tile_height * 0.75 - tile_height / 2 + "px",
         left: (this.x + this.y / 2 - 0.5) * tile_size + "px",
       };
+    },
+    army_without_outgoing: function() {
+      let army = this.army;
+      for (let movement_id in this.outgoing_movements)
+        army -= this.outgoing_movements[movement_id].amount;
+      return army >= 0 ? army : 0;
     },
   },
   methods: {

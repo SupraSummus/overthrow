@@ -43,3 +43,7 @@ export function coord_delta_one(source, target) {
     delta_one.z = 0;
   return coord_check(delta_one);
 }
+
+export function coord_equal(a, b) {
+  return a.x == b.x && a.y == b.y && a.z == b.z;
+}

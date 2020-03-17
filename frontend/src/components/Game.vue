@@ -18,12 +18,21 @@
             v-bind:key="tile_id"
             v-bind="tile"
             v-on:select="select_tile(tile.id)"
+            v-on:hover="hover_tile = tile"
           />
-          <movement
+          <movement-chain
             v-for="(movement, movement_id) in movements"
             v-bind:key="movement_id"
             v-bind="movement"
             v-on:delete="delete_movement(movement_id)"
+          />
+
+          <!-- hover path -->
+          <movement-chain
+            v-if="selected_tile && selected_tile.owned && hover_tile"
+            v-bind:source="selected_tile"
+            v-bind:target="hover_tile"
+            v-bind:amount="null"
           />
         </div>
       </panZoom>
@@ -35,7 +44,7 @@
 import Vue from "vue";
 
 import MapTile from "./MapTile.vue";
-import Movement from "./Movement.vue";
+import MovementChain from "./MovementChain.vue";
 import call_api from "@/api";
 import {
   coord_string as get_tile_coord_id,
@@ -47,7 +56,7 @@ import {
 export default {
   components: {
     MapTile,
-    Movement,
+    MovementChain,
   },
   props: ["id"],
   data: () => {
@@ -56,6 +65,7 @@ export default {
       tiles: {}, // tile id -> tile
       tile_ids_by_coord: {}, // tile coord string -> tile id
       selected_tile_id: null,
+      hover_tile: null,
       movements: {}, // movement id > movement
     };
   },
@@ -66,6 +76,13 @@ export default {
         if (this.players[player_id].user == user_id) return player_id;
       }
       return null;
+    },
+    selected_tile: function() {
+      if (this.selected_tile_id) {
+        return this.tiles[this.selected_tile_id];
+      } else {
+        return null;
+      }
     },
   },
   created: function() {
@@ -94,11 +111,15 @@ export default {
           x: null,
           y: null,
           z: null,
-          amount: null,
+          army: null,
           owner: null, // owner id
+
+          // relations
+          outgoing_movements: {}, // movement id -> movement object
+
+          // computed
           selected: false,
           owned: false,
-          outgoing_movements: {}, // movement id -> movement object
           borders: [], // set of delta coord strings to show border on
         });
       }
@@ -168,10 +189,10 @@ export default {
 
       if (movement.source == null || movement.source.id != source) {
         if (movement.source != null) {
-          delete movement.source.outgoing_movements[movement.id];
+          Vue.delete(movement.source.outgoing_movements, movement.id);
         }
         movement.source = this.get_or_create_tile(source);
-        movement.source.outgoing_movements[movement.id] = movement;
+        Vue.set(movement.source.outgoing_movements, movement.id, movement);
       }
 
       movement.target = this.get_or_create_tile(target);
