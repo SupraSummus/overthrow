@@ -12,10 +12,9 @@
           },
         }"
         @zoom="
-          console.log('zoom');
           $nextTick(() => {
             if ($refs.move_menu_slider) $refs.move_menu_slider.refresh();
-          });
+          })
         "
       >
         <div class="grid">
@@ -98,9 +97,6 @@ export default {
       hovered_tile: null,
       move_menu_tile: null,
       move_amount: 0,
-
-      //debug
-      console: window.console,
     };
   },
   computed: {
@@ -246,7 +242,6 @@ export default {
     },
 
     move: function(amount) {
-      console.log("move", amount);
       if (amount != 0) {
         call_api({
           method: "POST",
