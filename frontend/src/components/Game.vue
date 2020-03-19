@@ -47,6 +47,7 @@
                 lazy
                 @change="move"
                 @mousedown.native.stop
+                @touchstart.native.stop
               />
             </b-field>
           </context-dialog>
@@ -337,6 +338,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
+  user-select: none;
 }
 .grid {
   position: relative;
