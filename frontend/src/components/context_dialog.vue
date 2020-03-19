@@ -1,6 +1,6 @@
 <template>
   <on-map v-bind="$props">
-    <div class="dialog">
+    <div class="dialog box">
       <slot />
     </div>
   </on-map>
@@ -20,9 +20,6 @@ export default {
   position: absolute;
   transform: translate(-50%, -50%);
 
-  background-color: white;
-  padding: 1rem;
-  box-shadow: 0 0 2px;
-  width: 200px;
+  width: 300px;
 }
 </style>

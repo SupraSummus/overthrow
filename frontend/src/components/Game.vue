@@ -38,7 +38,7 @@
 
           <!-- movement command context menu -->
           <context-dialog v-if="move_menu_tile" v-bind="move_menu_tile">
-            <b-field>
+            <b-field label="Move">
               <b-slider
                 :value="0"
                 :min="0"
@@ -278,7 +278,8 @@ export default {
         this.selected_tile_id = tile_id;
       } else {
         // selected own tile -> command movement to this tile
-        this.move(this.selected_tile.army);
+        this.move_menu_tile = tile;
+        this.hovered_tile = tile;
       }
     },
 
@@ -290,14 +291,13 @@ export default {
     },
 
     on_contextmenu_tile: function(tile) {
-      // open move contextmenu
+      // move whole army
       if (
         this.selected_tile &&
         this.selected_tile.id != tile.id &&
         this.selected_tile.owned
       ) {
-        this.move_menu_tile = tile;
-        this.hovered_tile = tile;
+        this.move(this.selected_tile.army);
       }
     },
   },
