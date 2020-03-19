@@ -1,5 +1,7 @@
 import Vue from "vue";
 import panZoom from "vue-panzoom";
+import Buefy from "buefy";
+import "buefy/dist/buefy.css";
 
 import App from "./App.vue";
 import store from "./store";
@@ -9,11 +11,7 @@ Vue.config.productionTip = false;
 
 // install plugins
 Vue.use(panZoom);
-
-// vue slider
-import VueSlider from "vue-slider-component";
-import "vue-slider-component/theme/default.css";
-Vue.component("VueSlider", VueSlider);
+Vue.use(Buefy);
 
 new Vue({
   render: h => h(App),

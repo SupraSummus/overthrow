@@ -11,11 +11,6 @@
             return false;
           },
         }"
-        @zoom="
-          $nextTick(() => {
-            if ($refs.move_menu_slider) $refs.move_menu_slider.refresh();
-          })
-        "
       >
         <div class="grid">
           <map-tile
@@ -43,18 +38,17 @@
 
           <!-- movement command context menu -->
           <context-dialog v-if="move_menu_tile" v-bind="move_menu_tile">
-            <vue-slider
-              ref="move_menu_slider"
-              :value="0"
-              :adsorb="true"
-              :interval="1"
-              :min="0"
-              :max="selected_tile.army"
-              :lazy="true"
-              :marks="true"
-              @change="move"
-              @mousedown.native.stop
-            />
+            <b-field>
+              <b-slider
+                :value="0"
+                :min="0"
+                :max="selected_tile.army"
+                ticks
+                lazy
+                @change="move"
+                @mousedown.native.stop
+              />
+            </b-field>
           </context-dialog>
         </div>
       </panZoom>
