@@ -8,6 +8,7 @@
     <div class="movement-content">
       {{ amount }}
     </div>
+    <spinner v-if="processing > 0" class="movement-spinner" />
     <div
       class="movement-arrow"
       v-bind:style="{
@@ -20,11 +21,14 @@
 </template>
 
 <script>
+import Spinner from "vue-simple-spinner";
+
 import { coord_string } from "@/coord";
 import { tile_height, tile_width, delta_rotations } from "@/constants";
 
 export default {
-  props: ["source", "delta", "amount"],
+  props: ["source", "delta", "amount", "processing"],
+  components: { Spinner },
   computed: {
     top: function() {
       return (this.source.y + this.delta.y / 2) * tile_height * 0.75 + "px";
@@ -56,7 +60,8 @@ export default {
   position: absolute;
 }
 .movement-content,
-.movement-arrow {
+.movement-arrow,
+.movement-spinner {
   font-weight: bold;
   position: absolute;
   top: 50%;
@@ -68,5 +73,8 @@ export default {
   font-size: 60px;
   color: lightgray;
   z-index: -1;
+}
+.movement-spinner: {
+  background-color: rgba(255, 255, 255, 0.5);
 }
 </style>

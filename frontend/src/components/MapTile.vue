@@ -10,6 +10,7 @@
       <div class="tile-coords" v-if="owned">owned</div>
       <div class="tile-coords">{{ x }} / {{ y }} / {{ z }}</div>
     </div>
+    <spinner v-if="processing > 0" class="tile-spinner" />
 
     <!-- borders -->
     <div
@@ -27,6 +28,8 @@
 </template>
 
 <script>
+import Spinner from "vue-simple-spinner";
+
 import { delta_rotations, tile_size, tile_height } from "@/constants";
 
 const border_spacing = 5; //px
@@ -41,7 +44,9 @@ export default {
     "borders",
     "owned",
     "outgoing_movements",
+    "processing",
   ],
+  components: { Spinner },
   data: function() {
     return { tile_size, border_spacing };
   },
@@ -82,13 +87,16 @@ $border-width: $tile-side - $border-spacing * 2;
   height: $tile-height;
 }
 
-.tile-content {
+.tile-content,
+.tile-spinner {
   // center in parent container
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+}
 
+.tile-content {
   // center content
   text-align: center;
 

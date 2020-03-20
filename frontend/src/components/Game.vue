@@ -139,8 +139,11 @@ export default {
           army: null,
           owner: null, // owner id
 
-          // relations
+          // relations / index
           outgoing_movements: {}, // movement id -> movement object
+
+          // UI state
+          processing: 0,
 
           // computed
           selected: false,
@@ -207,7 +210,7 @@ export default {
           source: null,
           target: null,
           amount: null,
-          processing: false,
+          processing: 0,
         });
       }
       const movement = this.movements[id];
@@ -226,7 +229,7 @@ export default {
 
     delete_movement: function(id) {
       const movement = this.movements[id];
-      movement.processing = true;
+      movement.processing++;
       call_api({
         method: "DELETE",
         path: `movement/${id}/`,
@@ -238,14 +241,19 @@ export default {
 
     move: function(amount) {
       if (amount != 0) {
+        const source_tile = this.selected_tile;
+        source_tile.processing++;
         call_api({
           method: "POST",
-          path: `tile/${this.selected_tile.id}/move/`,
+          path: `tile/${source_tile.id}/move/`,
           payload: {
             target: this.hovered_tile.id,
             amount: amount,
           },
-        }).then(movement => this.load_movement(movement));
+        }).then(movement => {
+          source_tile.processing--;
+          this.load_movement(movement);
+        });
       }
 
       this.selected_tile_id = null;

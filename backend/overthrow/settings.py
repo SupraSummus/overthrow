@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'overthrow.delay_middleware.DelayMiddleware',  # For testing. Enabled by setting SLEEP_TIME [s].
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -140,3 +141,5 @@ REST_FRAMEWORK = {
 # CORS policy
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'^/api/.*$'
+
+SLEEP_TIME = env.int('SLEEP_TIME', default=0)
