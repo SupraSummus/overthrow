@@ -25,7 +25,8 @@
             v-for="(movement, movement_id) in movements"
             v-bind:key="movement_id"
             v-bind="movement"
-            v-on:delete="delete_movement(movement_id)"
+            v-on:delete="delete_movement(movement)"
+            v-on:select="select_movement(movement)"
           />
 
           <!-- hover path -->
@@ -46,6 +47,25 @@
                 ticks
                 lazy
                 @change="move"
+                @mousedown.native.stop
+                @touchstart.native.stop
+              />
+            </b-field>
+          </context-dialog>
+
+          <!-- movement edit context menu -->
+          <context-dialog
+            v-if="selected_movement"
+            v-bind="selected_movement.source"
+          >
+            <b-field label="Change">
+              <b-slider
+                :value="selected_movement.amount"
+                :min="0"
+                :max="selected_movement.source.army"
+                ticks
+                lazy
+                @change="change_movement"
                 @mousedown.native.stop
                 @touchstart.native.stop
               />
@@ -91,7 +111,7 @@ export default {
       selected_tile_id: null,
       hovered_tile: null,
       move_menu_tile: null,
-      move_amount: 0,
+      selected_movement: null,
     };
   },
   computed: {
@@ -227,8 +247,8 @@ export default {
       movement.amount = amount;
     },
 
-    delete_movement: function(id) {
-      const movement = this.movements[id];
+    delete_movement: function(movement) {
+      const id = movement.id;
       movement.processing++;
       call_api({
         method: "DELETE",
@@ -236,6 +256,30 @@ export default {
       }).then(() => {
         Vue.delete(movement.source.outgoing_movements, id);
         Vue.delete(this.movements, id);
+      });
+    },
+
+    select_movement: function(movement) {
+      this.selected_movement = movement;
+      this.move_menu_tile = null;
+    },
+
+    change_movement: function(amount) {
+      const movement = this.selected_movement;
+      this.selected_movement = null;
+
+      if (amount == 0) {
+        return this.delete_movement(movement);
+      }
+
+      movement.processing++;
+      return call_api({
+        method: "PATCH",
+        path: `movement/${movement.id}/`,
+        payload: { amount: amount },
+      }).then(resp => {
+        this.load_movement(resp);
+        movement.processing--;
       });
     },
 
@@ -262,6 +306,8 @@ export default {
     },
 
     on_select_tile: function(tile) {
+      this.selected_movement = null;
+
       const tile_id = tile.id;
 
       if (this.move_menu_tile) {
@@ -299,6 +345,8 @@ export default {
     },
 
     on_contextmenu_tile: function(tile) {
+      this.selected_movement = null;
+
       // move whole army
       if (
         this.selected_tile &&
@@ -328,7 +376,7 @@ export default {
           path: `game/${game_id}/movements/`,
         }).then(movements => {
           for (let movement_id in this.movements)
-            this.delete_movement[movement_id];
+            this.delete_movement(this.movements[movement_id]);
           movements.forEach(movement => this.load_movement(movement));
         });
       },

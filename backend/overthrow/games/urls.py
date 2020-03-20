@@ -12,5 +12,5 @@ urlpatterns = [
     path('api/game/<uuid:id>/players/', views.PlayerListView.as_view()),
     path('api/tile/<uuid:id>/move/', views.MoveAPIView.as_view()),
     path('api/game/<uuid:id>/movements/', views.MoveListAPIView.as_view()),
-    path('api/movement/<uuid:id>/', views.MovementDeleteAPIView.as_view()),
+    path('api/movement/<uuid:pk>/', views.MovementAPIView.as_view()),
 ]

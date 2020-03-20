@@ -49,13 +49,10 @@ class MoveAPIView(TileViewMixin, generics.CreateAPIView):
         serializer.save(source=self.tile)
 
 
-class MovementDeleteAPIView(generics.DestroyAPIView):
+class MovementAPIView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.MovementCommandPermission]
-
-    def get_object(self):
-        movement = get_object_or_404(Movement, id=self.kwargs['id'])
-        self.check_object_permissions(self.request, movement)
-        return movement
+    queryset = Movement.objects.all()
+    serializer_class = serializers.MovementSerializer
 
 
 class MoveListAPIView(GameViewMixin, generics.ListAPIView):

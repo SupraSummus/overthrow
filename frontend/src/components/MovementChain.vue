@@ -5,6 +5,7 @@
       v-bind:key="id"
       v-bind="step"
       v-on:click.native="step_clicked(step)"
+      v-on:contextmenu.native.prevent="step_contextmenu(step)"
     />
   </div>
 </template>
@@ -36,6 +37,11 @@ export default {
   },
   methods: {
     step_clicked: function(step) {
+      if (coord_equal(step.source, this.source)) {
+        this.$emit("select");
+      }
+    },
+    step_contextmenu: function(step) {
       if (coord_equal(step.source, this.source)) {
         this.$emit("delete");
       }
