@@ -3,6 +3,15 @@ import store from "./store";
 const api_port = 8000;
 const api_url = `${window.location.protocol}//${window.location.hostname}:${api_port}/api/`;
 
+class APIClientError extends Error {
+  constructor(response, ...params) {
+    super(...params);
+    this.response = response;
+    this.name = "APIClientError";
+  }
+}
+export { APIClientError };
+
 const call_api = ({ method, path, payload }) => {
   const headers = { "Content-Type": "application/json" };
   if (store.state.auth_token) {
@@ -13,17 +22,22 @@ const call_api = ({ method, path, payload }) => {
     headers,
     body: JSON.stringify(payload),
   }).then(response => {
-    // no content
+    // ok but no content
     if (response.status == 204) return null;
 
-    if (response.ok) {
-      return response.json();
-    } else if (response.status >= 400 && response.status < 500) {
-      throw response.json();
-    } else {
-      console.error(response);
-      throw "unexpected response";
+    // ok with content
+    if (response.ok) return response.json();
+
+    // client's fault
+    if (response.status >= 400 && response.status < 500) {
+      return response.json().then(message => {
+        const e = new APIClientError(message);
+        throw e;
+      });
     }
+
+    console.error("unexpected response", response);
+    throw response;
   });
 };
 
