@@ -26,6 +26,8 @@
 </template>
 
 <script>
+import { update_form_messages } from "@/forms";
+
 export default {
   data() {
     return {
@@ -59,28 +61,7 @@ export default {
           this.$router.push({ name: "game", params: { id: "default" } }),
         )
         .catch(e => {
-          // clear status
-          this.processing = false;
-          this.message = "";
-          for (let name in this.fields) {
-            this.fields[name].message = "";
-          }
-
-          // probably server error
-          // instanceof doesn't work because of some babel magic
-          if (e.name != "APIClientError") {
-            this.message = "Oops, something went wrong.";
-            throw e;
-          }
-
-          // set messages
-          if ("non_field_errors" in e.response) {
-            this.message = e.response["non_field_errors"].join(", ");
-          }
-          for (let name in this.fields) {
-            const field = this.fields[name];
-            if (name in e.response) field.message = e.response[name].join(", ");
-          }
+          update_form_messages(this, e);
         });
     },
   },

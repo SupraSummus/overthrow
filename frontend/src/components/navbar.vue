@@ -18,9 +18,9 @@
     <template slot="end">
       <b-navbar-item tag="div" v-if="!$store.getters.is_logged_in">
         <div class="buttons">
-          <a class="button is-primary">
+          <router-link class="button is-primary" :to="{ name: 'sign_up' }">
             <strong>Sign up</strong>
-          </a>
+          </router-link>
           <router-link class="button is-light" :to="{ name: 'login' }">
             Log in
           </router-link>

@@ -3,6 +3,7 @@ import VueRouter from "vue-router";
 
 import Game from "@/components/Game.vue";
 import Login from "@/components/Login.vue";
+import SignUp from "@/components/sign_up.vue";
 import store from "@/store";
 
 Vue.use(VueRouter);
@@ -27,6 +28,11 @@ const routes = [
     path: "/login",
     component: Login,
     name: "login",
+  },
+  {
+    path: "/signup",
+    component: SignUp,
+    name: "sign_up",
   },
 ];
 

@@ -8,3 +8,7 @@ class UserDetailAPIView(generics.RetrieveAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class RegisterAPIView(generics.CreateAPIView):
+    serializer_class = serializers.UserSerializer
