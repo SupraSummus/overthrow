@@ -13,6 +13,7 @@
         }"
         @panstart="just_panned = true"
         @click.native.capture="filter_panzoom_click"
+        @touchend.native="just_panned = false"
       >
         <div class="grid">
           <map-tile
