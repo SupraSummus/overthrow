@@ -11,6 +11,8 @@
             return false;
           },
         }"
+        @panstart="just_panned = true"
+        @click.native.capture="filter_panzoom_click"
       >
         <div class="grid">
           <map-tile
@@ -112,6 +114,7 @@ export default {
       hovered_tile: null,
       move_menu_tile: null,
       selected_movement: null,
+      just_panned: false,
     };
   },
   computed: {
@@ -354,6 +357,14 @@ export default {
         this.selected_tile.owned
       ) {
         this.move(this.selected_tile.army);
+      }
+    },
+
+    filter_panzoom_click: function(e) {
+      // absorb one click coming from mouseup after panend
+      if (this.just_panned) {
+        this.just_panned = false;
+        e.stopPropagation();
       }
     },
   },
