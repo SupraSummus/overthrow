@@ -21,9 +21,9 @@
           <a class="button is-primary">
             <strong>Sign up</strong>
           </a>
-          <a class="button is-light">
+          <router-link class="button is-light" :to="{ name: 'login' }">
             Log in
-          </a>
+          </router-link>
         </div>
       </b-navbar-item>
 
