@@ -10,6 +10,7 @@ const store = new Vuex.Store({
     auth_token: localStorage.getItem("auth_token") || null,
     user: {},
   },
+
   mutations: {
     logged_in(state, { token }) {
       state.auth_token = token;
@@ -20,13 +21,13 @@ const store = new Vuex.Store({
       localStorage.removeItem("auth_token");
       store.dispatch("fetch_user_info"); // welp, this probably shuda be in actions
     },
-    user_info_fethced(state, user) {
+    user_info_fetched(state, user) {
       state.user = user;
     },
   },
 
   actions: {
-    login({ commit }, { username, password }) {
+    log_in({ commit }, { username, password }) {
       return new Promise((resolve, reject) => {
         call_api({
           path: "token-auth/",
@@ -44,6 +45,10 @@ const store = new Vuex.Store({
       });
     },
 
+    log_out({ commit }) {
+      commit("logged_out");
+    },
+
     fetch_user_info({ commit }) {
       return new Promise((resolve, reject) => {
         call_api({
@@ -51,7 +56,7 @@ const store = new Vuex.Store({
           method: "GET",
         })
           .then(resp => {
-            commit("user_info_fethced", resp);
+            commit("user_info_fetched", resp);
             resolve(resp);
           })
           .catch(err => reject(err));

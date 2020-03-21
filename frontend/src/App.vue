@@ -1,30 +1,20 @@
 <template>
   <div>
+    <navbar />
     <login v-if="!$store.getters.is_logged_in" />
-
-    <nav class="navbar" v-if="$store.getters.is_logged_in">
-      <div class="navbar-item">
-        <router-link :to="{ name: 'game', params: { id: 'default' } }"
-          >a map</router-link
-        >
-      </div>
-      <div class="navbar-item">
-        <logout />
-      </div>
-    </nav>
 
     <router-view></router-view>
   </div>
 </template>
 
 <script>
+import Navbar from "./components/navbar.vue";
 import Login from "./components/Login.vue";
-import Logout from "./components/Logout.vue";
 
 export default {
   components: {
+    Navbar,
     Login,
-    Logout,
   },
 };
 </script>

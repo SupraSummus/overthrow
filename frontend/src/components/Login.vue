@@ -36,7 +36,10 @@ export default {
     login: function() {
       this.message = "logging in ...";
       this.$store
-        .dispatch("login", { username: this.username, password: this.password })
+        .dispatch("log_in", {
+          username: this.username,
+          password: this.password,
+        })
         .then(() =>
           this.$router.push({ name: "game", params: { id: "default" } }),
         )
