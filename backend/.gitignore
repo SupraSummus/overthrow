@@ -1,3 +1,4 @@
+.env
+.hypothesis
 *.pyc
 *.sqlite3
-.env
