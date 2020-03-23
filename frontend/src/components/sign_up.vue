@@ -15,12 +15,25 @@
           v-model="fields.password.value"
         />
 
+        <b-field
+          :type="fields.recaptcha.message ? 'is-danger' : ''"
+          :message="fields.recaptcha.message"
+          v-if="fields.recaptcha.site_key"
+        >
+          <vue-recaptcha
+            ref="recaptcha"
+            :sitekey="fields.recaptcha.site_key"
+            :loadRecaptchaScript="true"
+            @verify="fields.recaptcha.value = $event"
+          />
+        </b-field>
+
         <div class="buttons">
           <b-button
             type="is-primary"
             native-type="submit"
             :loading="processing"
-            :disabled="!fields.password.value"
+            :disabled="!fields.password.value || !fields.recaptcha.value"
           >
             Sign up
           </b-button>
@@ -33,12 +46,14 @@
 </template>
 
 <script>
+import VueRecaptcha from "vue-recaptcha";
+
 import DoublePasswordField from "@/components/double_password_field.vue";
 import call_api from "@/api";
 import { update_form_messages } from "@/forms";
 
 export default {
-  components: { DoublePasswordField },
+  components: { DoublePasswordField, VueRecaptcha },
   data() {
     return {
       fields: {
@@ -50,6 +65,7 @@ export default {
           message: "",
           value: "",
         },
+        recaptcha: { message: "", value: "", site_key: "" },
       },
       processing: false,
       message: "",
@@ -64,9 +80,13 @@ export default {
         payload: {
           username: this.fields.username.value,
           password: this.fields.password.value,
+          recaptcha: this.fields.recaptcha.value,
         },
       });
-      create_user.catch(e => update_form_messages(this, e));
+      create_user.catch(e => {
+        this.$refs.recaptcha.reset();
+        update_form_messages(this, e);
+      });
       create_user
         .then(() =>
           this.$store.dispatch("log_in", {
@@ -78,6 +98,14 @@ export default {
           this.$router.push({ name: "game", params: { id: "default" } }),
         );
     },
+  },
+  created() {
+    call_api({
+      method: "GET",
+      path: "recaptcha/",
+    }).then(response => {
+      this.fields.recaptcha.site_key = response.site_key;
+    });
   },
 };
 </script>

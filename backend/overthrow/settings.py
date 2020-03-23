@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
+    'rest_framework_recaptcha',
     'corsheaders',
 
     'overthrow.users',
@@ -142,4 +143,10 @@ REST_FRAMEWORK = {
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_URLS_REGEX = r'^/api/.*$'
 
+# delay for testing
 SLEEP_TIME = env.int('SLEEP_TIME', default=0)
+
+# Recaptcha
+RECAPTCHA_SITE_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
+RECAPTCHA_SECRET_KEY = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'  # public testing key
+DRF_RECAPTCHA_SECRET_KEY = RECAPTCHA_SECRET_KEY
