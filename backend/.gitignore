@@ -1,4 +1,6 @@
+.coverage
 .env
 .hypothesis
 *.pyc
 *.sqlite3
+htmlcov

@@ -4,11 +4,8 @@ from overthrow.games.factories import PlayerFactory
 from overthrow.games.models import Game, Tile, Movement
 
 
-max_radius = 3
-
-
 @strategies.composite
-def boards(draw, max_radius=max_radius):
+def boards(draw, max_radius=None):
     """ A game without any armies and players """
     radius = draw(strategies.integers(min_value=0, max_value=max_radius))
     return Game.generate_hexagonal(radius)
@@ -17,14 +14,14 @@ def boards(draw, max_radius=max_radius):
 @strategies.composite
 def games(
     draw,
-    max_radius=max_radius,
+    max_radius=2,
     min_player_count=0,
     max_player_count=5,
     unowned_tiles=True,
     unowned_armies=True,
     min_army_count=0,
     max_army_count=100,
-    max_movement_count=10,
+    max_movement_count=None,
     max_movement_amount=100,
 ):
     if min_player_count == 0 and not unowned_tiles:
@@ -62,7 +59,7 @@ def games(
 
 
 @strategies.composite
-def movement_sets(draw, tiles, max_movement_amount=100, max_movement_count=100):
+def movement_sets(draw, tiles, max_movement_amount=100, max_movement_count=None):
     tile_strategy = strategies.sampled_from(tiles)
     amount_strategy = strategies.integers(min_value=1, max_value=max_movement_amount)
     movements = draw(strategies.lists(
@@ -85,7 +82,7 @@ def movement_sets(draw, tiles, max_movement_amount=100, max_movement_count=100):
 
 
 @strategies.composite
-def coords(draw, max_radius=max_radius):
+def coords(draw, max_radius=None):
     x = draw(strategies.integers(min_value=-max_radius, max_value=max_radius))
     y = draw(strategies.integers(min_value=-max_radius, max_value=max_radius))
     z = -x - y

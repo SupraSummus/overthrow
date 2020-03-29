@@ -35,3 +35,13 @@ def step_towards(src, dst):
 
 def next_on_path(src, dst):
     return sum(src, step_towards(src, dst))
+
+
+neighbour_deltas = (
+    (-1, 0, 1),
+    (-1, 1, 0),
+    (0, -1, 1),
+    (0, 1, -1),
+    (1, -1, 0),
+    (1, 0, -1),
+)

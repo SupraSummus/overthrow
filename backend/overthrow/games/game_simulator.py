@@ -104,10 +104,7 @@ class GameSimulator:
     def simulate(self):
         self.simulate_battles()
         self.simulate_owner_changes()
-        self.simulate_movements(
-            self.tiles_by_id, self.movements_by_id, self.tiles_by_coords,
-            self.tiles_to_be_updated,
-        )
+        self.simulate_movements()
 
     def simulate_battles(self):
         tile_defending_armies = {}  # tile id -> amount
@@ -167,11 +164,20 @@ class GameSimulator:
                         * receiving_army / (attacking_armies_sum - dealing_army)  # receiving army share
                     )
                     for player_id, dealing_army in attacking_armies_by_player.items()
-                    if player_id != source_tile.owner_id
+                    if (
+                        player_id != source_tile.owner_id and
+                        attacking_armies_sum - dealing_army > 0
+                    )
                 )
-                if source_tile.owner_id != target_tile.owner_id:
-                    # received from defenders
-                    deaths += tile_defending_armies[target_tile_id] * DEFENSE_TO_ATTACK_EFFICIENCY
+
+                # received from defenders
+                defenders_defending_against = attacking_armies_sum - attacking_armies_by_player[target_tile.owner_id]
+                if source_tile.owner_id != target_tile.owner_id and defenders_defending_against > 0:
+                    deaths += (
+                        (tile_defending_armies[target_tile_id] * DEFENSE_TO_ATTACK_EFFICIENCY) *
+                        receiving_army / defenders_defending_against
+                    )
+
                 deaths = min(deaths, source_tile.army)
                 if deaths > 0:
                     source_tile.army -= deaths
@@ -185,19 +191,15 @@ class GameSimulator:
         for movement in self.movements_by_id.values():
             pass
 
-    def simulate_movements(
-        self,
-        tiles_by_id, movements_by_id, tiles_by_coords,
-        tiles_to_be_updated,
-    ):
+    def simulate_movements(self):
         armies_in = defaultdict(int)
         armies_out = defaultdict(int)
         movement_delta_by_path = defaultdict(int)
 
-        for movement in list(movements_by_id.values()):
-            source_tile = tiles_by_id[movement.source_id]
-            target_tile = tiles_by_id[movement.target_id]
-            next_tile = tiles_by_coords[coords.next_on_path(
+        for movement in list(self.movements_by_id.values()):
+            source_tile = self.tiles_by_id[movement.source_id]
+            target_tile = self.tiles_by_id[movement.target_id]
+            next_tile = self.tiles_by_coords[coords.next_on_path(
                 source_tile.coords,
                 target_tile.coords,
             )]
@@ -237,4 +239,4 @@ class GameSimulator:
                 continue
             tile = self.tiles_by_id[tile_id]
             tile.army += delta
-            tiles_to_be_updated.add(tile_id)
+            self.tiles_to_be_updated.add(tile_id)

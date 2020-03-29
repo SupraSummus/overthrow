@@ -1,39 +1,67 @@
 from collections import defaultdict
+import math
 
-from hypothesis import given, assume, settings
-from hypothesis.extra.django import TestCase
 from django.db.models import Sum
+from hypothesis import given, assume
+from hypothesis.extra.django import TestCase
 
-from overthrow.games.models import Game, Tile, Movement
 from overthrow.games import coords
+from overthrow.games.game_simulator import (
+    zip_dicts,
+    DEFENSE_TO_ATTACK_EFFICIENCY, ATTACK_TO_DEFENSE_EFFICIENCY, ATTACK_TO_ATTACK_EFFICIENCY,
+)
+from overthrow.games.models import Tile, Movement
 from overthrow.games.tests import strategies
+
+
+def get_armies_by_user_id(game):
+    return {
+        r['owner_id']: r['army__sum'] for r in
+        Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
+    }
 
 
 class ExploitsTestCase(TestCase):
     """ Everything user can do is allowed by game rules """
 
     @given(game=strategies.games())
-    def test_no_armies_for_free(self, game):
+    def test_no_armies_from_nothing(self, game):
         """ Army count cannot grow during fight phase """
-        before = {
-            r['owner_id']: r['army__sum'] for r in
-            Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
-        }
-        Game.simulate(game)
-        after = {
-            r['owner_id']: r['army__sum'] for r in
-            Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
-        }
-        for player_id in before:
-            self.assertLessEqual(after[player_id], before[player_id])
+        before = get_armies_by_user_id(game)
+        game.simulate()
+        after = get_armies_by_user_id(game)
+        for player_id, (b, a) in zip_dicts(before, after):
+            self.assertLessEqual(a, b)
 
-    def test_no_teleportation(self):
+    @given(game=strategies.games())
+    def test_no_teleportation(self, game):
         """ Armies may move at most one step at the time """
-        pass  # TODO
+        max_armies_by_coords = defaultdict(int)
+        for tile in Tile.objects.filter(game=game):
+            max_armies_by_coords[tile.coords] += tile.army
+            for d in coords.neighbour_deltas:
+                max_armies_by_coords[coords.sum(tile.coords, d)] += tile.army
+        game.simulate()
+        for tile in Tile.objects.filter(game=game):
+            self.assertLessEqual(tile.army, max_armies_by_coords[tile.coords])
 
-    def test_no_double_attack(self):
+    @given(game=strategies.games(
+        unowned_tiles=False,
+        min_player_count=1,
+        max_player_count=3,
+    ))
+    def test_no_double_attack(self, game):
         """ Armies can deal limited amount of damage each turn """
-        pass  # TODO
+        before = get_armies_by_user_id(game)
+        game.simulate()
+        after = get_armies_by_user_id(game)
+        for player_id, (b, a) in zip_dicts(before, after):
+            max_damage = (sum(before.values()) - b) * max(
+                DEFENSE_TO_ATTACK_EFFICIENCY,
+                ATTACK_TO_DEFENSE_EFFICIENCY,
+                ATTACK_TO_ATTACK_EFFICIENCY,
+            )
+            self.assertGreaterEqual(a, math.floor(b - max_damage))
 
 
 class PossibilitiesTestCase(TestCase):
@@ -59,7 +87,7 @@ class PossibilitiesTestCase(TestCase):
                 movement_happening = True
                 expected_tile_army_after += movement.amount
         assume(movement_happening)
-        Game.simulate(game)
+        game.simulate()
         tile.refresh_from_db()
         self.assertEqual(tile.army, expected_tile_army_after)
 
@@ -67,7 +95,6 @@ class PossibilitiesTestCase(TestCase):
 class FacilitiesTestCase(TestCase):
     """ Test behaviours which make controlling the game easier. """
 
-    @settings(print_blob=True)
     @given(game=strategies.games(
         max_radius=2,
         unowned_tiles=False,
@@ -76,7 +103,6 @@ class FacilitiesTestCase(TestCase):
         min_army_count=18,
         max_army_count=18,
         max_movement_amount=3,
-        max_movement_count=6,
     ))
     def test_movements_work_on_long_distances(self, game):
         """ Movements transfers armies aross many tiles and many turns """
@@ -87,7 +113,7 @@ class FacilitiesTestCase(TestCase):
             if next_tile_coords == tile.coords and movement.target_id != tile.id:
                 amount_by_target[movement.target_id] += movement.amount
         assume(amount_by_target)
-        Game.simulate(game)
+        game.simulate()
         for target_id, amount in amount_by_target.items():
             movement = Movement.objects.filter(
                 source=tile,
@@ -95,7 +121,6 @@ class FacilitiesTestCase(TestCase):
             ).get()
             self.assertEqual(movement.amount, amount)
 
-    @settings(print_blob=True)
     @given(game=strategies.games(
         unowned_tiles=False,
         min_player_count=1,
@@ -114,6 +139,6 @@ class FacilitiesTestCase(TestCase):
         ).annotate(Sum('amount')):
             will_move += min(m['source__army'], m['amount__sum'])
         travel_required_before = get_travel_required()
-        Game.simulate(game)
+        game.simulate()
         travel_required_after = get_travel_required()
         self.assertEqual(travel_required_before - will_move, travel_required_after)
