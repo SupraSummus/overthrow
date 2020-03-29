@@ -1,4 +1,4 @@
-from collections import defaultdict
+from pprint import pformat
 import itertools
 
 from django.conf import settings
@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q, F
-from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from . import coords
 from overthrow.utils import UUIDModel
@@ -39,75 +39,48 @@ class Game(UUIDModel):
         player.grant_initial_tiles(tile_count=10, army=10)
         return player
 
-    def _simulate_movements(self):
-        movements_to_be_deleted = {}  # id -> movement
-        movements_to_be_updated = {}  # id -> movement
-        tiles_to_be_updated = {}  # id -> tile
-        incoming_movements = {}  # tile coord -> list of movements
-        tiles_by_coords = {}  # tile coord -> tile object
-        for source_tile in self.tiles.all():
-            # index by tile coord
-            tiles_by_coords[source_tile.coords] = source_tile
-
-            for movement in source_tile.outgoing_movements.all():
-                # trim outgoing armies to field army
-                movement.amount = min(movement.amount, source_tile.army)
-                if movement.amount == 0:
-                    movements_to_be_deleted[movement.id] = movement
-                    continue
-                movements_to_be_updated[movement.id] = movement
-
-                # decrease field army
-                source_tile.army -= movement.amount
-                tiles_to_be_updated[source_tile.id] = source_tile
-
-                # index by field reached in single step
-                step = coords.step_towards(source_tile.coords, movement.target.coords)
-                target = coords.sum(source_tile.coords, step)
-                incoming_movements.setdefault(target, []).append(movement)
-
-        for tile_coords, movements in incoming_movements.items():
-            tile = tiles_by_coords[tile_coords]
-            fighting_forces = defaultdict(int)  # player id -> army count
-
-            if tile.army:
-                fighting_forces[tile.owner_id] += tile.army
-
-            for movement in movements:
-                fighting_forces[movement.source.owner_id] += movement.amount
-
-            if len(fighting_forces) == 1:
-                tile.army = list(fighting_forces.values())[0]
-                tiles_to_be_updated[tile.id] = tile
-
-                for movement in movements:
-                    if movement.target_id == tile.id:
-                        movements_to_be_deleted[movement.id] = movement
-                    else:
-                        movement.source = tile
-                        movements_to_be_updated[movement.id] = movement
-            else:
-                raise NotImplementedError()
-
-        Movement.objects.bulk_update(movements_to_be_updated.values(), ['source', 'amount'])
-        Movement.objects.filter(id__in=movements_to_be_deleted.keys()).delete()
-        Tile.objects.bulk_update(tiles_to_be_updated.values(), ['army', 'owner'])
-
     @transaction.atomic
     def simulate(self):
-        # select all realtaed things and lock them untill the end of transaction
-        game = self.__class__.objects.filter(id=self.id).select_related(
-            'tiles',
-            'tiles__outgoing_movements',
-            'tiles__outgoing_movements__target',
-            'tiles__owner',
-        ).select_for_update().get()
+        from overthrow.games.game_simulator import GameSimulator
 
+        # lock and retrieve needed objects
+        tiles = list(Tile.objects.filter(game=self).select_for_update())
+        movements = list(Movement.objects.filter(source__game=self).select_for_update())
+
+        # simulate
+        simulator = GameSimulator(tiles, movements)
+        simulator.simulate()
+
+        # save new state
+        Tile.objects.bulk_update([
+            simulator.tiles_by_id[tile_id]
+            for tile_id in simulator.tiles_to_be_updated
+        ], ['army', 'owner_id'])
+        Movement.objects.filter(id__in=simulator.movements_to_be_deleted).delete()
+        for m in simulator.movements_to_be_created:
+            m.game = self
+        Movement.objects.bulk_create(simulator.movements_to_be_created)
+        Movement.objects.bulk_update(simulator.movements_to_be_updated, ['amount'])
+
+    @transaction.atomic
+    def simulate_till_now(self):
         # simulate steps until we catch up
+        assert False, "not really implemented"
+        # select all realtaed things and lock them untill the end of transaction
+        game = self.__class__.objects.filter(id=self.id).select_for_update().get()
         while game.started_at + (game.tick + 1) * settings.TICK_DURATION < timezone.now():
-            game._simulate_movements()
+            game.simulate()
             game.tick += 1
             game.save()
+
+    def as_plain(self):
+        return {
+            'tiles': [t.as_plain() for t in self.tiles.all()],
+            'players': [p.id for p in self.players.all()],
+        }
+
+    def __repr__(self):
+        return pformat(self.as_plain())
 
 
 class Player(UUIDModel):
@@ -190,6 +163,15 @@ class Tile(UUIDModel):
     def coords(self):
         return (self.x, self.y, self.z)
 
+    def as_plain(self):
+        return {
+            'id': self.id,
+            'coords': self.coords,
+            'owner': self.owner_id,
+            'army': self.army,
+            'outgoing_movements': [m.as_plain() for m in self.outgoing_movements.all()],
+        }
+
 
 class Movement(UUIDModel):
     source = models.ForeignKey(
@@ -219,3 +201,9 @@ class Movement(UUIDModel):
 
         if self.source.game_id != self.target.game_id:
             raise ValidationError(_('Source and target have to be tiles in the same game.'))
+
+    def as_plain(self):
+        return {
+            'target': self.target.coords,
+            'amount': self.amount,
+        }

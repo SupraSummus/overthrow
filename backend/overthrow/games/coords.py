@@ -31,3 +31,7 @@ def step_towards(src, dst):
     d = tuple(map(_sign, d))
     assert __builtins__['sum'](d) == 0, d
     return d
+
+
+def next_on_path(src, dst):
+    return sum(src, step_towards(src, dst))

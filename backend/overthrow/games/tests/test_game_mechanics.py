@@ -1,55 +1,119 @@
-from hypothesis import given, assume
-from hypothesis.extra.django import TestCase, from_model
+from collections import defaultdict
+
+from hypothesis import given, assume, settings
+from hypothesis.extra.django import TestCase
 from django.db.models import Sum
 
-from overthrow.games.models import Game, Tile, Player, Movement
+from overthrow.games.models import Game, Tile, Movement
 from overthrow.games import coords
 from overthrow.games.tests import strategies
-from overthrow.games.factories import PlayerFactory
 
 
 class ExploitsTestCase(TestCase):
     """ Everything user can do is allowed by game rules """
 
-    @given(from_model(Game))
-    def test_army_conservation(self, game):
-        """ Army count must be preserved during move, when there are no battles (single player) """
-        print(game)
-        assume(Player.objects.filter(tiles__game=game).count() <= 1)
-        before = Tile.objects.filter(game=game).aggregate(Sum('army'))
-        game._simulate_movements()
-        after = Tile.objects.filter(game=game).aggregate(Sum('army'))
-        self.assertEqual(before, after)
+    @given(game=strategies.games())
+    def test_no_armies_for_free(self, game):
+        """ Army count cannot grow during fight phase """
+        before = {
+            r['owner_id']: r['army__sum'] for r in
+            Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
+        }
+        Game.simulate(game)
+        after = {
+            r['owner_id']: r['army__sum'] for r in
+            Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
+        }
+        for player_id in before:
+            self.assertLessEqual(after[player_id], before[player_id])
+
+    def test_no_teleportation(self):
+        """ Armies may move at most one step at the time """
+        pass  # TODO
+
+    def test_no_double_attack(self):
+        """ Armies can deal limited amount of damage each turn """
+        pass  # TODO
 
 
 class PossibilitiesTestCase(TestCase):
     """ User can do everything that is allowed by game rules """
 
-    @given(game=strategies.board(), source=strategies.coords(), target=strategies.coords())
-    def test_everything_is_reachable(self, game, source, target):
-        assume(source != target)
-        source_tile = Tile.objects.filter(game=game, **coords.as_dict(source)).first()
-        assume(source_tile is not None)
-        target_tile = Tile.objects.filter(game=game, **coords.as_dict(target)).first()
-        assume(target_tile is not None)
+    @given(game=strategies.games(
+        unowned_tiles=False,
+        min_player_count=1,
+        max_player_count=1,
+        min_army_count=60,
+        max_movement_amount=10,
+    ))
+    def test_movement_moves_armies(self, game):
+        tile = Tile.objects.get(game=game, x=0, y=0, z=0)
+        expected_tile_army_after = tile.army
+        movement_happening = False
+        for movement in Movement.objects.filter(source__game=game).select_related('source', 'target'):
+            if movement.source_id == tile.id:
+                movement_happening = True
+                expected_tile_army_after -= movement.amount
+            next_tile_coords = coords.next_on_path(movement.source.coords, movement.target.coords)
+            if next_tile_coords == tile.coords:
+                movement_happening = True
+                expected_tile_army_after += movement.amount
+        assume(movement_happening)
+        Game.simulate(game)
+        tile.refresh_from_db()
+        self.assertEqual(tile.army, expected_tile_army_after)
 
-        source_tile.owner = PlayerFactory(game=game)
-        source_tile.army = 1
-        source_tile.save()
-        movement = Movement.objects.create(source=source_tile, target=target_tile, amount=1)
 
-        distance_before = coords.distance(movement.source.coords, movement.target.coords)
+class FacilitiesTestCase(TestCase):
+    """ Test behaviours which make controlling the game easier. """
 
-        # go one step and refresh ORM cache
-        game._simulate_movements()
-        movement = Movement.objects.filter(id=movement.id).first()
+    @settings(print_blob=True)
+    @given(game=strategies.games(
+        max_radius=2,
+        unowned_tiles=False,
+        min_player_count=1,
+        max_player_count=1,
+        min_army_count=18,
+        max_army_count=18,
+        max_movement_amount=3,
+        max_movement_count=6,
+    ))
+    def test_movements_work_on_long_distances(self, game):
+        """ Movements transfers armies aross many tiles and many turns """
+        tile = Tile.objects.get(game=game, x=0, y=0, z=0)
+        amount_by_target = defaultdict(int)
+        for movement in Movement.objects.filter(source__game=game).select_related('source', 'target'):
+            next_tile_coords = coords.next_on_path(movement.source.coords, movement.target.coords)
+            if next_tile_coords == tile.coords and movement.target_id != tile.id:
+                amount_by_target[movement.target_id] += movement.amount
+        assume(amount_by_target)
+        Game.simulate(game)
+        for target_id, amount in amount_by_target.items():
+            movement = Movement.objects.filter(
+                source=tile,
+                target_id=target_id,
+            ).get()
+            self.assertEqual(movement.amount, amount)
 
-        if movement is None:
-            # we reached target
-            target_tile.refresh_from_db()
-            self.assertEqual(target_tile.army, 1)
-
-        else:
-            # check that we are coming closer
-            distance_after = coords.distance(movement.source.coords, movement.target.coords)
-            self.assertEqual(distance_before, distance_after + 1)
+    @settings(print_blob=True)
+    @given(game=strategies.games(
+        unowned_tiles=False,
+        min_player_count=1,
+        max_player_count=1,
+    ))
+    def test_movements_are_deleted_only_when_armies_reach_destination(self, game):
+        def get_travel_required():
+            travel_required = 0
+            for m in Movement.objects.filter(source__game=game).select_related('source', 'target'):
+                travel_required += coords.distance(m.source.coords, m.target.coords) * m.amount
+            return travel_required
+        will_move = 0
+        for m in Movement.objects.filter(source__game=game).values(
+            'source__id',
+            'source__army',
+        ).annotate(Sum('amount')):
+            will_move += min(m['source__army'], m['amount__sum'])
+        travel_required_before = get_travel_required()
+        Game.simulate(game)
+        travel_required_after = get_travel_required()
+        self.assertEqual(travel_required_before - will_move, travel_required_after)
