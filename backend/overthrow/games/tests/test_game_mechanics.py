@@ -1,16 +1,20 @@
 from collections import defaultdict
+from uuid import UUID
 import math
+from unittest import mock
+import random
 
 from django.db.models import Sum
 from hypothesis import given, assume
 from hypothesis.extra.django import TestCase
+import hypothesis
 
 from overthrow.games import coords
 from overthrow.games.game_simulator import (
     zip_dicts,
     DEFENSE_TO_ATTACK_EFFICIENCY, ATTACK_TO_DEFENSE_EFFICIENCY, ATTACK_TO_ATTACK_EFFICIENCY,
 )
-from overthrow.games.models import Tile, Movement
+from overthrow.games.models import Tile, Movement, Player
 from overthrow.games.tests import strategies
 
 
@@ -19,6 +23,20 @@ def get_armies_by_user_id(game):
         r['owner_id']: r['army__sum'] for r in
         Tile.objects.filter(game=game).values('owner_id').annotate(Sum('army'))
     }
+
+
+class UUID4Patcher:
+    def setUp(self):
+        super().setUp()
+        self.uuid4_patcher = mock.patch(
+            'uuid.uuid4',
+            new_callable=lambda: UUID(int=random.getrandbits(32), version=4)
+        )
+        self.uuid4_patcher.start()
+
+    def tearDown(self):
+        self.uuid4_patcher.stop()
+        super().tearDown()
 
 
 class ExploitsTestCase(TestCase):
@@ -64,15 +82,15 @@ class ExploitsTestCase(TestCase):
             self.assertGreaterEqual(a, math.floor(b - max_damage))
 
 
-class PossibilitiesTestCase(TestCase):
+class PossibilitiesTestCase(UUID4Patcher, TestCase):
     """ User can do everything that is allowed by game rules """
 
     @given(game=strategies.games(
         unowned_tiles=False,
         min_player_count=1,
         max_player_count=1,
-        min_army_count=60,
-        max_movement_amount=10,
+        min_army_count=18,
+        max_movement_amount=3,
     ))
     def test_movement_moves_armies(self, game):
         tile = Tile.objects.get(game=game, x=0, y=0, z=0)
@@ -90,6 +108,31 @@ class PossibilitiesTestCase(TestCase):
         game.simulate()
         tile.refresh_from_db()
         self.assertEqual(tile.army, expected_tile_army_after)
+
+    @given(game=strategies.games(
+        max_radius=2,
+        min_player_count=1,
+        max_army_count=0,
+        max_movement_count=0,
+    ), data=hypothesis.strategies.data())
+    def test_tile_without_army_gets_conquered(self, game, data):
+        player = Player.objects.filter(game=game).first()
+        assume(player)
+        player_tiles = list(Tile.objects.filter(game=game, owner=player))
+        assume(player_tiles)
+        Tile.objects.filter(game=game, owner=player).update(army=1)
+        movements = data.draw(strategies.movement_sets(
+            source_tiles=player_tiles,
+            target_tiles=list(Tile.objects.filter(game=game)),
+        ), label="player's movements")
+        game.simulate()
+        for m in movements:
+            next_tile_coords = coords.next_on_path(m.source.coords, m.target.coords)
+            tile = Tile.objects.get(game=game, **coords.as_dict(next_tile_coords))
+            self.assertEqual(
+                tile.owner_id,
+                player.id,
+            )
 
 
 class FacilitiesTestCase(TestCase):

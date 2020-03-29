@@ -207,3 +207,6 @@ class Movement(UUIDModel):
             'target': self.target.coords,
             'amount': self.amount,
         }
+
+    def __repr__(self):
+        return pformat(self.as_plain())

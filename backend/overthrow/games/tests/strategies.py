@@ -22,7 +22,7 @@ def games(
     min_army_count=0,
     max_army_count=100,
     max_movement_count=None,
-    max_movement_amount=100,
+    max_movement_amount=10000,
 ):
     if min_player_count == 0 and not unowned_tiles:
         raise ValueError("Zero posible owners")
@@ -40,7 +40,7 @@ def games(
     ))
 
     # assign tiles and create armies
-    owner_strategy = strategies.sampled_from([None] if unowned_tiles else [] + players)
+    owner_strategy = strategies.sampled_from([None] + players if unowned_tiles else players)
     army_count_strategy = strategies.integers(min_value=min_army_count, max_value=max_army_count)
     tiles = list(game.tiles.all())
     for tile in tiles:
@@ -50,7 +50,8 @@ def games(
     Tile.objects.bulk_update(tiles, ['owner_id', 'army'])
 
     draw(movement_sets(
-        tiles,
+        source_tiles=tiles,
+        target_tiles=tiles,
         max_movement_amount=max_movement_amount,
         max_movement_count=max_movement_count,
     ))
@@ -59,14 +60,17 @@ def games(
 
 
 @strategies.composite
-def movement_sets(draw, tiles, max_movement_amount=100, max_movement_count=None):
-    tile_strategy = strategies.sampled_from(tiles)
+def movement_sets(
+    draw,
+    source_tiles, target_tiles,
+    max_movement_amount=10000, max_movement_count=None,
+):
     amount_strategy = strategies.integers(min_value=1, max_value=max_movement_amount)
     movements = draw(strategies.lists(
         strategies.builds(
             Movement,
-            source=tile_strategy,
-            target=tile_strategy,
+            source=strategies.sampled_from(source_tiles),
+            target=strategies.sampled_from(target_tiles),
             amount=amount_strategy,
         ),
         unique_by=lambda m: (m.source_id, m.target.id),
