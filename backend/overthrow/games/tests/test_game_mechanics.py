@@ -1,7 +1,6 @@
 from collections import defaultdict
-from uuid import UUID
-import math
 from unittest import mock
+import math
 import random
 
 from django.db.models import Sum
@@ -25,18 +24,18 @@ def get_armies_by_user_id(game):
     }
 
 
-class UUID4Patcher:
+class OSUrandomPatcher:
     def setUp(self):
-        super().setUp()
-        self.uuid4_patcher = mock.patch(
-            'uuid.uuid4',
-            new_callable=lambda: UUID(int=random.getrandbits(32), version=4)
+        self._os_urandom_patcher = mock.patch(
+            'os.urandom',
+            new=lambda size: bytes(random.getrandbits(8) for _ in range(size)),
         )
-        self.uuid4_patcher.start()
+        self._os_urandom_patcher.start()
+        super().setUp()
 
     def tearDown(self):
-        self.uuid4_patcher.stop()
         super().tearDown()
+        self._os_urandom_patcher.stop()
 
 
 class ExploitsTestCase(TestCase):
@@ -48,7 +47,7 @@ class ExploitsTestCase(TestCase):
         before = get_armies_by_user_id(game)
         game.simulate()
         after = get_armies_by_user_id(game)
-        for player_id, (b, a) in zip_dicts(before, after):
+        for player_id, (b, a) in zip_dicts(before, after, default=0):
             self.assertLessEqual(a, b)
 
     @given(game=strategies.games())
@@ -73,7 +72,7 @@ class ExploitsTestCase(TestCase):
         before = get_armies_by_user_id(game)
         game.simulate()
         after = get_armies_by_user_id(game)
-        for player_id, (b, a) in zip_dicts(before, after):
+        for player_id, (b, a) in zip_dicts(before, after, default=0):
             max_damage = (sum(before.values()) - b) * max(
                 DEFENSE_TO_ATTACK_EFFICIENCY,
                 ATTACK_TO_DEFENSE_EFFICIENCY,
@@ -82,7 +81,7 @@ class ExploitsTestCase(TestCase):
             self.assertGreaterEqual(a, math.floor(b - max_damage))
 
 
-class PossibilitiesTestCase(UUID4Patcher, TestCase):
+class PossibilitiesTestCase(OSUrandomPatcher, TestCase):
     """ User can do everything that is allowed by game rules """
 
     @given(game=strategies.games(
@@ -112,20 +111,31 @@ class PossibilitiesTestCase(UUID4Patcher, TestCase):
     @given(game=strategies.games(
         max_radius=2,
         min_player_count=1,
-        max_army_count=0,
+        max_army_count=1,
         max_movement_count=0,
     ), data=hypothesis.strategies.data())
-    def test_tile_without_army_gets_conquered(self, game, data):
+    def test_tiles_can_be_conquered(self, game, data):
         player = Player.objects.filter(game=game).first()
         assume(player)
+
         player_tiles = list(Tile.objects.filter(game=game, owner=player))
         assume(player_tiles)
-        Tile.objects.filter(game=game, owner=player).update(army=1)
+
+        # create user movements
+        minimal_winning_amount = 1 + math.ceil(1 / ATTACK_TO_DEFENSE_EFFICIENCY)
         movements = data.draw(strategies.movement_sets(
             source_tiles=player_tiles,
             target_tiles=list(Tile.objects.filter(game=game)),
+            min_movement_amount=minimal_winning_amount,
+            max_movement_amount=minimal_winning_amount,
         ), label="player's movements")
+        assume(movements)
+
+        Tile.objects.filter(game=game, owner=player).update(
+            army=minimal_winning_amount * len(movements),
+        )
         game.simulate()
+
         for m in movements:
             next_tile_coords = coords.next_on_path(m.source.coords, m.target.coords)
             tile = Tile.objects.get(game=game, **coords.as_dict(next_tile_coords))

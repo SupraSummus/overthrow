@@ -63,9 +63,11 @@ def games(
 def movement_sets(
     draw,
     source_tiles, target_tiles,
-    max_movement_amount=10000, max_movement_count=None,
+    min_movement_amount=1,
+    max_movement_amount=10000,
+    max_movement_count=None,
 ):
-    amount_strategy = strategies.integers(min_value=1, max_value=max_movement_amount)
+    amount_strategy = strategies.integers(min_value=min_movement_amount, max_value=max_movement_amount)
     movements = draw(strategies.lists(
         strategies.builds(
             Movement,
