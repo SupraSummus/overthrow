@@ -1,6 +1,7 @@
 .coverage
 .env
 .hypothesis
+*.egg-info
 *.pyc
 *.sqlite3
 htmlcov

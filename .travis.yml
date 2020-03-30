@@ -1,0 +1,17 @@
+language: python
+python:
+  - "3.8"
+services:
+  - postgresql
+env:
+  - SECRET_KEY=notsosecret DATABASE_URL=psql://postgres@localhost:5432/overthrow
+before_install:
+  - pip install poetry
+install:
+  - pip install coverage codecov
+  - poetry install
+script:
+  - flake8
+  - coverage run --source=overthrow manage.py test
+after_success:
+  - codecov
