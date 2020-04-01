@@ -12,6 +12,7 @@ install:
   - poetry install
 script:
   - flake8
+  - black --exclude 'overthrow/[\w]+/migrations|\.git|frontend' --check .
   - coverage run --source=overthrow manage.py test
 after_success:
   - codecov

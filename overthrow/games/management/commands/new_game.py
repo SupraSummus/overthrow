@@ -3,10 +3,10 @@ from overthrow.games.models import Game
 
 
 class Command(BaseCommand):
-    help = 'Create a new game'
+    help = "Create a new game"
 
     def add_arguments(self, parser):
-        parser.add_argument('radius', type=int)
+        parser.add_argument("radius", type=int)
 
     def handle(self, radius, **kwargs):
         game = Game.generate_hexagonal(radius)

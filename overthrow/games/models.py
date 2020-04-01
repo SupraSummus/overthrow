@@ -24,15 +24,11 @@ class Game(UUIDModel):
         game = Game.objects.create()
         tiles = []
         for x, y in itertools.product(
-            range(-radius, radius + 1),
-            range(-radius, radius + 1),
+            range(-radius, radius + 1), range(-radius, radius + 1),
         ):
             z = -x - y
             if abs(x) <= radius and abs(y) <= radius and abs(z) <= radius:
-                tiles.append(Tile(
-                    game=game,
-                    x=x, y=y, z=z,
-                ))
+                tiles.append(Tile(game=game, x=x, y=y, z=z,))
         Tile.objects.bulk_create(tiles)
         return game
 
@@ -54,15 +50,18 @@ class Game(UUIDModel):
         simulator.simulate()
 
         # save new state
-        Tile.objects.bulk_update([
-            simulator.tiles_by_id[tile_id]
-            for tile_id in simulator.tiles_to_be_updated
-        ], ['army', 'owner_id'])
+        Tile.objects.bulk_update(
+            [
+                simulator.tiles_by_id[tile_id]
+                for tile_id in simulator.tiles_to_be_updated
+            ],
+            ["army", "owner_id"],
+        )
         Movement.objects.filter(id__in=simulator.movements_to_be_deleted).delete()
         for m in simulator.movements_to_be_created:
             m.game = self
         Movement.objects.bulk_create(simulator.movements_to_be_created)
-        Movement.objects.bulk_update(simulator.movements_to_be_updated, ['amount'])
+        Movement.objects.bulk_update(simulator.movements_to_be_updated, ["amount"])
 
     @transaction.atomic
     def simulate_till_now(self):
@@ -70,15 +69,17 @@ class Game(UUIDModel):
         assert False, "not really implemented"
         # select all realtaed things and lock them untill the end of transaction
         game = self.__class__.objects.filter(id=self.id).select_for_update().get()
-        while game.started_at + (game.tick + 1) * settings.TICK_DURATION < timezone.now():
+        while (
+            game.started_at + (game.tick + 1) * settings.TICK_DURATION < timezone.now()
+        ):
             game.simulate()
             game.tick += 1
             game.save()
 
     def as_plain(self):
         return {
-            'tiles': [t.as_plain() for t in self.tiles.all()],
-            'players': [p.id for p in self.players.all()],
+            "tiles": [t.as_plain() for t in self.tiles.all()],
+            "players": [p.id for p in self.players.all()],
         }
 
     def __repr__(self):
@@ -95,40 +96,34 @@ class ExpliciteTreeManager(TreeManager):
 
 
 class Player(UUIDModel, MPTTModel):
-    game = models.ForeignKey(
-        Game,
-        on_delete=models.CASCADE,
-        related_name="players",
-    )
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="players",)
     user = models.ForeignKey(
-        get_user_model(),
-        on_delete=models.CASCADE,
-        related_name="+",
+        get_user_model(), on_delete=models.CASCADE, related_name="+",
     )
     corporation = models.ForeignKey(
         Corporation,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='members',
+        related_name="members",
     )
     boss = models.ForeignKey(
-        'self',
+        "self",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='subordinates',
+        related_name="subordinates",
     )
 
     objects = ExpliciteTreeManager()
 
     class MPTTMeta:
-        parent_attr = 'boss'
-        tree_id_attr = 'corporation'
+        parent_attr = "boss"
+        tree_id_attr = "corporation"
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['game', 'user'], name='unique_player'),
+            models.UniqueConstraint(fields=["game", "user"], name="unique_player"),
         ]
 
     @transaction.atomic
@@ -137,8 +132,7 @@ class Player(UUIDModel, MPTTModel):
 
         # select tile nearest to origin
         nearest_to_origin = sorted(
-            free_tiles,
-            key=lambda tile: coords.distance(tile.coords, (0, 0, 0)),
+            free_tiles, key=lambda tile: coords.distance(tile.coords, (0, 0, 0)),
         )
         if not nearest_to_origin:
             return []
@@ -146,24 +140,19 @@ class Player(UUIDModel, MPTTModel):
 
         # select tiles nearest to initial tile
         granted_tiles = sorted(
-            free_tiles,
-            key=lambda tile: coords.distance(tile.coords, initial.coords),
+            free_tiles, key=lambda tile: coords.distance(tile.coords, initial.coords),
         )[:tile_count]
 
         # set ownership
         for tile in granted_tiles:
             tile.owner = self
             tile.army = army
-        Tile.objects.bulk_update(granted_tiles, ['owner', 'army'])
+        Tile.objects.bulk_update(granted_tiles, ["owner", "army"])
         return granted_tiles
 
 
 class Tile(UUIDModel):
-    game = models.ForeignKey(
-        Game,
-        on_delete=models.CASCADE,
-        related_name="tiles",
-    )
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="tiles",)
 
     # coords for the hex in cubic coordinate system
     x = models.IntegerField()
@@ -171,24 +160,19 @@ class Tile(UUIDModel):
     z = models.IntegerField()
 
     owner = models.ForeignKey(
-        Player,
-        on_delete=models.SET_NULL,
-        related_name="tiles",
-        null=True,
+        Player, on_delete=models.SET_NULL, related_name="tiles", null=True,
     )
-    army = models.PositiveIntegerField(
-        default=0,
-    )
+    army = models.PositiveIntegerField(default=0,)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['game', 'x', 'y'], name='unique_xy_coords'),
-            models.UniqueConstraint(fields=['game', 'x', 'z'], name='unique_xz_coords'),
-            models.UniqueConstraint(fields=['game', 'y', 'z'], name='unique_yz_coords'),
+            models.UniqueConstraint(fields=["game", "x", "y"], name="unique_xy_coords"),
+            models.UniqueConstraint(fields=["game", "x", "z"], name="unique_xz_coords"),
+            models.UniqueConstraint(fields=["game", "y", "z"], name="unique_yz_coords"),
         ]
 
     def __str__(self):
-        return f'{self.x}, {self.y}, {self.z}'
+        return f"{self.x}, {self.y}, {self.z}"
 
     @property
     def coords(self):
@@ -196,34 +180,29 @@ class Tile(UUIDModel):
 
     def as_plain(self):
         return {
-            'id': self.id,
-            'coords': self.coords,
-            'owner': self.owner_id,
-            'army': self.army,
-            'outgoing_movements': [m.as_plain() for m in self.outgoing_movements.all()],
+            "id": self.id,
+            "coords": self.coords,
+            "owner": self.owner_id,
+            "army": self.army,
+            "outgoing_movements": [m.as_plain() for m in self.outgoing_movements.all()],
         }
 
 
 class Movement(UUIDModel):
     source = models.ForeignKey(
-        Tile,
-        on_delete=models.CASCADE,
-        related_name='outgoing_movements',
+        Tile, on_delete=models.CASCADE, related_name="outgoing_movements",
     )
     target = models.ForeignKey(
-        Tile,
-        on_delete=models.CASCADE,
-        related_name='incoming_movements'
+        Tile, on_delete=models.CASCADE, related_name="incoming_movements"
     )
     amount = models.PositiveIntegerField()
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['source', 'target'], name='unique_path'),
-            models.CheckConstraint(check=Q(amount__gte=1), name='nonempty_amount'),
+            models.UniqueConstraint(fields=["source", "target"], name="unique_path"),
+            models.CheckConstraint(check=Q(amount__gte=1), name="nonempty_amount"),
             models.CheckConstraint(
-                check=~Q(source=F('target')),
-                name='nonempty_distance',
+                check=~Q(source=F("target")), name="nonempty_distance",
             ),
         ]
 
@@ -231,12 +210,14 @@ class Movement(UUIDModel):
         super().clean()
 
         if self.source.game_id != self.target.game_id:
-            raise ValidationError(_('Source and target have to be tiles in the same game.'))
+            raise ValidationError(
+                _("Source and target have to be tiles in the same game.")
+            )
 
     def as_plain(self):
         return {
-            'target': self.target.coords,
-            'amount': self.amount,
+            "target": self.target.coords,
+            "amount": self.amount,
         }
 
     def __repr__(self):

@@ -34,7 +34,6 @@ class MovementFactory(factory.django.DjangoModelFactory):
 
     source = factory.SubFactory(TileFactory)
     target = factory.SubFactory(
-        TileFactory,
-        game=factory.SelfAttribute('..source.game'),
+        TileFactory, game=factory.SelfAttribute("..source.game"),
     )
     amount = 1

@@ -19,6 +19,4 @@ class RegisterAPIView(generics.CreateAPIView):
 
 class RecaptchaAPIView(APIView):
     def get(self, request, format=None):
-        return Response({
-            'site_key': settings.RECAPTCHA_SITE_KEY,
-        })
+        return Response({"site_key": settings.RECAPTCHA_SITE_KEY,})

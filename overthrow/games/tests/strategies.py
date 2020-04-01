@@ -31,32 +31,37 @@ def games(
     game = draw(boards(max_radius=max_radius))
 
     # create players
-    players = draw(strategies.lists(
-        strategies.builds(
-            PlayerFactory,
-            game=strategies.just(game),
-        ),
-        min_size=min_player_count,
-        max_size=max_player_count,
-    ))
+    players = draw(
+        strategies.lists(
+            strategies.builds(PlayerFactory, game=strategies.just(game),),
+            min_size=min_player_count,
+            max_size=max_player_count,
+        )
+    )
 
     # assign tiles and create armies
-    owner_strategy = strategies.sampled_from([None] + players if unowned_tiles else players)
-    army_count_strategy = strategies.integers(min_value=min_army_count, max_value=max_army_count)
+    owner_strategy = strategies.sampled_from(
+        [None] + players if unowned_tiles else players
+    )
+    army_count_strategy = strategies.integers(
+        min_value=min_army_count, max_value=max_army_count
+    )
     tiles = list(game.tiles.all())
     for tile in tiles:
         tile.owner = draw(owner_strategy)
         if tile.owner is not None or unowned_armies:
             tile.army = draw(army_count_strategy)
-    Tile.objects.bulk_update(tiles, ['owner_id', 'army'])
+    Tile.objects.bulk_update(tiles, ["owner_id", "army"])
 
-    draw(movement_sets(
-        source_tiles=tiles,
-        target_tiles=tiles,
-        max_movement_amount=max_movement_amount,
-        min_movement_count=min_movement_count,
-        max_movement_count=max_movement_count,
-    ))
+    draw(
+        movement_sets(
+            source_tiles=tiles,
+            target_tiles=tiles,
+            max_movement_amount=max_movement_amount,
+            min_movement_count=min_movement_count,
+            max_movement_count=max_movement_count,
+        )
+    )
 
     return game
 
@@ -64,29 +69,30 @@ def games(
 @strategies.composite
 def movement_sets(
     draw,
-    source_tiles, target_tiles,
+    source_tiles,
+    target_tiles,
     min_movement_amount=1,
     max_movement_amount=10000,
     min_movement_count=0,
     max_movement_count=None,
 ):
-    amount_strategy = strategies.integers(min_value=min_movement_amount, max_value=max_movement_amount)
-    movements = draw(strategies.lists(
-        strategies.builds(
-            Movement,
-            source=strategies.sampled_from(source_tiles),
-            target=strategies.sampled_from(target_tiles),
-            amount=amount_strategy,
-        ),
-        unique_by=lambda m: (m.source_id, m.target.id),
-        min_size=min_movement_count,
-        max_size=max_movement_count,
-    ))
-    movements = [
-        m
-        for m in movements
-        if m.source_id != m.target_id
-    ]
+    amount_strategy = strategies.integers(
+        min_value=min_movement_amount, max_value=max_movement_amount
+    )
+    movements = draw(
+        strategies.lists(
+            strategies.builds(
+                Movement,
+                source=strategies.sampled_from(source_tiles),
+                target=strategies.sampled_from(target_tiles),
+                amount=amount_strategy,
+            ),
+            unique_by=lambda m: (m.source_id, m.target.id),
+            min_size=min_movement_count,
+            max_size=max_movement_count,
+        )
+    )
+    movements = [m for m in movements if m.source_id != m.target_id]
     assume(len(movements) >= min_movement_count)
     Movement.objects.bulk_create(movements)
     return movements

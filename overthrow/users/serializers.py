@@ -7,14 +7,13 @@ from .models import User
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password', 'recaptcha']
-        extra_kwargs = {'password': {'write_only': True}}
+        fields = ["id", "username", "email", "password", "recaptcha"]
+        extra_kwargs = {"password": {"write_only": True}}
 
     recaptcha = ReCaptchaField()
 
     def save(self, **kwargs):
-        del self.validated_data['recaptcha']
+        del self.validated_data["recaptcha"]
         User.objects.create_user(
-            **self.validated_data,
-            **kwargs,
+            **self.validated_data, **kwargs,
         )

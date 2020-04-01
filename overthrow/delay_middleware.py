@@ -17,7 +17,6 @@ import django.core.exceptions
 
 
 class DelayMiddleware:
-
     def __init__(self, get_response):
         self.get_response = get_response
         self.sleep_time = getattr(django.conf.settings, "SLEEP_TIME", 0)

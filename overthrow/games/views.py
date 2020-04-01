@@ -9,8 +9,8 @@ from . import serializers, permissions
 class GameViewMixin:
     @cached_property
     def game(self):
-        if 'id' in self.kwargs:
-            return get_object_or_404(Game, id=self.kwargs['id'])
+        if "id" in self.kwargs:
+            return get_object_or_404(Game, id=self.kwargs["id"])
         else:
             # stub. until we have multi-game aware frontend
             return Game.objects.first()
@@ -34,7 +34,7 @@ class TileListView(GameViewMixin, generics.ListAPIView):
 class TileViewMixin:
     @cached_property
     def tile(self):
-        return get_object_or_404(Tile, id=self.kwargs['id'])
+        return get_object_or_404(Tile, id=self.kwargs["id"])
 
 
 class MoveAPIView(TileViewMixin, generics.CreateAPIView):
@@ -60,6 +60,5 @@ class MoveListAPIView(GameViewMixin, generics.ListAPIView):
 
     def get_queryset(self):
         return Movement.objects.filter(
-            source__game=self.game,
-            source__owner__user=self.request.user,
+            source__game=self.game, source__owner__user=self.request.user,
         )

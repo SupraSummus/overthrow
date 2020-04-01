@@ -26,9 +26,7 @@ def zip_dicts(*dcts, default=None):
 
 class GameSimulator:
     def __init__(
-        self,
-        tiles,
-        movements,
+        self, tiles, movements,
     ):
         self.tiles_by_id = {tile.id: tile for tile in tiles}
         self.tiles_by_coords = {tile.coords: tile for tile in self.tiles_by_id.values()}
@@ -50,8 +48,7 @@ class GameSimulator:
     def get_tile_total_outgoing(self, tile_id):
         if self._total_outgoing_by_tile.get(tile_id) is None:
             self._total_outgoing_by_tile[tile_id] = sum(
-                movement.amount
-                for movement in self.movements_by_source[tile_id]
+                movement.amount for movement in self.movements_by_source[tile_id]
             )
         return self._total_outgoing_by_tile[tile_id]
 
@@ -72,17 +69,17 @@ class GameSimulator:
     def get_movement_effective_amount(self, movement):
         source_tile = self.tiles_by_id[movement.source_id]
         return math.floor(
-            source_tile.army *
-            movement.amount / self.get_tile_total_outgoing(movement.source_id)
+            source_tile.army
+            * movement.amount
+            / self.get_tile_total_outgoing(movement.source_id)
         )
 
     def get_movement_next_tile(self, movement):
         source_tile = self.tiles_by_id[movement.source_id]
         target_tile = self.tiles_by_id[movement.target_id]
-        next_tile = self.tiles_by_coords[coords.next_on_path(
-            source_tile.coords,
-            target_tile.coords,
-        )]
+        next_tile = self.tiles_by_coords[
+            coords.next_on_path(source_tile.coords, target_tile.coords,)
+        ]
         return next_tile
 
     def get_movement_owner(self, movement):
@@ -95,11 +92,7 @@ class GameSimulator:
             movement.amount = amount
             self._movements_to_be_updated[movement.id] = True
         else:
-            movement = Movement(
-                source_id=path[0],
-                target_id=path[1],
-                amount=amount,
-            )
+            movement = Movement(source_id=path[0], target_id=path[1], amount=amount,)
             self.movements_to_be_created.append(movement)
         self.add_movement(movement)
 
@@ -149,10 +142,7 @@ class GameSimulator:
 
     @property
     def movements_to_be_deleted(self):
-        return [
-            m.id
-            for m in self._movements_to_be_deleted.values()
-        ]
+        return [m.id for m in self._movements_to_be_deleted.values()]
 
     def are_enemies(self, player_a_id, player_b_id):
         return player_a_id != player_b_id
@@ -177,9 +167,13 @@ class GameSimulator:
         for movement in self.movements_by_id.values():
             source_tile = self.tiles_by_id[movement.source_id]
             target_tile = self.tiles_by_id[movement.target_id]
-            movement_amount = min(movement.amount, tile_defending_armies[movement.source_id])
+            movement_amount = min(
+                movement.amount, tile_defending_armies[movement.source_id]
+            )
             tile_defending_armies[movement.source_id] -= movement_amount
-            next_tile_coords = coords.next_on_path(source_tile.coords, target_tile.coords)
+            next_tile_coords = coords.next_on_path(
+                source_tile.coords, target_tile.coords
+            )
             next_tile = self.tiles_by_coords[next_tile_coords]
             _add_to_dict_entry(
                 tile_attacking_armies,
@@ -190,11 +184,14 @@ class GameSimulator:
         # calculate defender losses, decrease attacking armies accordingly
         for tile_id, attacking_armies in tile_attacking_armies.items():
             tile = self.tiles_by_id[tile_id]
-            force = sum(
-                amount
-                for source_tile_id, amount in attacking_armies.items()
-                if self.tiles_by_id[source_tile_id].owner_id != tile.owner_id
-            ) * ATTACK_TO_DEFENSE_EFFICIENCY
+            force = (
+                sum(
+                    amount
+                    for source_tile_id, amount in attacking_armies.items()
+                    if self.tiles_by_id[source_tile_id].owner_id != tile.owner_id
+                )
+                * ATTACK_TO_DEFENSE_EFFICIENCY
+            )
             losses = min(force, tile.army)
             if losses > 0:
                 tile.army -= losses
@@ -219,22 +216,35 @@ class GameSimulator:
                 source_tile = self.tiles_by_id[source_tile_id]
                 deaths = sum(
                     (
-                        (dealing_army * ATTACK_TO_ATTACK_EFFICIENCY)  # dealing army force
-                        * receiving_army / (attacking_armies_sum - dealing_army)  # receiving army share
+                        (
+                            dealing_army * ATTACK_TO_ATTACK_EFFICIENCY
+                        )  # dealing army force
+                        * receiving_army
+                        / (attacking_armies_sum - dealing_army)  # receiving army share
                     )
                     for player_id, dealing_army in attacking_armies_by_player.items()
                     if (
-                        player_id != source_tile.owner_id and
-                        attacking_armies_sum - dealing_army > 0
+                        player_id != source_tile.owner_id
+                        and attacking_armies_sum - dealing_army > 0
                     )
                 )
 
                 # received from defenders
-                defenders_defending_against = attacking_armies_sum - attacking_armies_by_player[target_tile.owner_id]
-                if source_tile.owner_id != target_tile.owner_id and defenders_defending_against > 0:
+                defenders_defending_against = (
+                    attacking_armies_sum
+                    - attacking_armies_by_player[target_tile.owner_id]
+                )
+                if (
+                    source_tile.owner_id != target_tile.owner_id
+                    and defenders_defending_against > 0
+                ):
                     deaths += (
-                        (tile_defending_armies[target_tile_id] * DEFENSE_TO_ATTACK_EFFICIENCY) *
-                        receiving_army / defenders_defending_against
+                        (
+                            tile_defending_armies[target_tile_id]
+                            * DEFENSE_TO_ATTACK_EFFICIENCY
+                        )
+                        * receiving_army
+                        / defenders_defending_against
                     )
 
                 deaths = min(deaths, source_tile.army)
@@ -269,15 +279,15 @@ class GameSimulator:
         for movement in list(self.movements_by_id.values()):
             source_tile = self.tiles_by_id[movement.source_id]
             target_tile = self.tiles_by_id[movement.target_id]
-            next_tile = self.tiles_by_coords[coords.next_on_path(
-                source_tile.coords,
-                target_tile.coords,
-            )]
-            amount = min(source_tile.army - armies_out[movement.source_id], movement.amount)
+            next_tile = self.tiles_by_coords[
+                coords.next_on_path(source_tile.coords, target_tile.coords,)
+            ]
+            amount = min(
+                source_tile.army - armies_out[movement.source_id], movement.amount
+            )
 
-            if (
-                amount == 0 or
-                not self.is_transfer_possible(source_tile.owner_id, next_tile.owner_id)
+            if amount == 0 or not self.is_transfer_possible(
+                source_tile.owner_id, next_tile.owner_id
             ):
                 # couldnt execute the movement
                 continue
@@ -303,7 +313,9 @@ class GameSimulator:
                 self.update_movement_amount(movement, delta)
 
         # update tiles
-        for tile_id, (incoming, outgoing) in zip_dicts(armies_in, armies_out, default=0):
+        for tile_id, (incoming, outgoing) in zip_dicts(
+            armies_in, armies_out, default=0
+        ):
             delta = incoming - outgoing
             if delta == 0:
                 continue

@@ -12,7 +12,7 @@ def sum(a, b):
 
 
 def as_dict(v):
-    return dict(zip(('x', 'y', 'z'), v))
+    return dict(zip(("x", "y", "z"), v))
 
 
 def _sign(x):
@@ -29,7 +29,7 @@ def step_towards(src, dst):
     i = a.index(min(a))
     d[i] = 0
     d = tuple(map(_sign, d))
-    assert __builtins__['sum'](d) == 0, d
+    assert __builtins__["sum"](d) == 0, d
     return d
 
 
