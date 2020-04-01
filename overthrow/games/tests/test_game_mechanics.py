@@ -14,6 +14,7 @@ from overthrow.games.game_simulator import (
     DEFENSE_TO_ATTACK_EFFICIENCY, ATTACK_TO_DEFENSE_EFFICIENCY, ATTACK_TO_ATTACK_EFFICIENCY,
 )
 from overthrow.games.models import Tile, Movement, Player
+from overthrow.games.factories import CorporationFactory
 from overthrow.games.tests import strategies
 
 
@@ -143,6 +144,35 @@ class PossibilitiesTestCase(OSUrandomPatcher, TestCase):
                 tile.owner_id,
                 player.id,
             )
+
+    @given(game=strategies.games(
+        max_radius=1,
+        unowned_tiles=False,
+        min_player_count=2, max_player_count=2,
+        min_movement_count=1, max_movement_count=1,
+    ), data=hypothesis.strategies.data())
+    def test_movement_across_friendly_borders(self, game, data):
+        movement = Movement.objects.filter(source__game=game).select_related('source', 'target').first()
+        next_tile = Tile.objects.filter(game=game, **coords.as_dict(coords.next_on_path(
+            movement.source.coords,
+            movement.target.coords,
+        ))).first()
+        assume(movement.source.owner_id != next_tile.owner_id)
+        amount = min(movement.source.army, movement.amount)
+        assume(amount > 0)
+        expected_army = amount + next_tile.army
+
+        # create management structure
+        boss, subordinate = tuple(game.players.all())
+        boss.corporation = CorporationFactory()
+        boss.save()
+        subordinate.boss = boss
+        subordinate.save()
+
+        game.simulate()
+
+        next_tile.refresh_from_db()
+        self.assertEqual(next_tile.army, expected_army)
 
 
 class FacilitiesTestCase(TestCase):

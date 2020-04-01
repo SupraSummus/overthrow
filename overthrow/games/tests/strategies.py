@@ -21,6 +21,7 @@ def games(
     unowned_armies=True,
     min_army_count=0,
     max_army_count=100,
+    min_movement_count=0,
     max_movement_count=None,
     max_movement_amount=10000,
 ):
@@ -53,6 +54,7 @@ def games(
         source_tiles=tiles,
         target_tiles=tiles,
         max_movement_amount=max_movement_amount,
+        min_movement_count=min_movement_count,
         max_movement_count=max_movement_count,
     ))
 
@@ -65,6 +67,7 @@ def movement_sets(
     source_tiles, target_tiles,
     min_movement_amount=1,
     max_movement_amount=10000,
+    min_movement_count=0,
     max_movement_count=None,
 ):
     amount_strategy = strategies.integers(min_value=min_movement_amount, max_value=max_movement_amount)
@@ -76,6 +79,7 @@ def movement_sets(
             amount=amount_strategy,
         ),
         unique_by=lambda m: (m.source_id, m.target.id),
+        min_size=min_movement_count,
         max_size=max_movement_count,
     ))
     movements = [
@@ -83,6 +87,7 @@ def movement_sets(
         for m in movements
         if m.source_id != m.target_id
     ]
+    assume(len(movements) >= min_movement_count)
     Movement.objects.bulk_create(movements)
     return movements
 

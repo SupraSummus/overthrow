@@ -154,6 +154,12 @@ class GameSimulator:
             for m in self._movements_to_be_deleted.values()
         ]
 
+    def are_enemies(self, player_a_id, player_b_id):
+        return player_a_id != player_b_id
+
+    def is_transfer_possible(self, player_a_id, player_b_id):
+        return player_a_id == player_b_id
+
     def simulate(self):
         self.simulate_battles()
         self.simulate_owner_changes()
@@ -248,8 +254,9 @@ class GameSimulator:
                 parties.add(tile.owner_id)
             for movement_id in movement_ids:
                 amount = self.get_movement_effective_amount(movement_id)
-                if amount > 0:
-                    parties.add(self.get_movement_owner(movement_id))
+                movement_owner = self.get_movement_owner(movement_id)
+                if amount > 0 and self.are_enemies(tile.owner_id, movement_owner):
+                    parties.add(movement_owner)
             if len(parties) == 1:
                 new_owner_id = list(parties)[0]
                 self.update_tile_owner(tile, new_owner_id)
@@ -270,7 +277,7 @@ class GameSimulator:
 
             if (
                 amount == 0 or
-                source_tile.owner_id != next_tile.owner_id
+                not self.is_transfer_possible(source_tile.owner_id, next_tile.owner_id)
             ):
                 # couldnt execute the movement
                 continue
