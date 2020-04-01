@@ -41,13 +41,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.sessions',
     'django.contrib.staticfiles',
-    'rest_framework',
-    'rest_framework.authtoken',
-    'rest_framework_recaptcha',
-    'corsheaders',
 
-    'overthrow.users',
+    'corsheaders',
+    'mptt',
+    'rest_framework_recaptcha',
+    'rest_framework.authtoken',
+    'rest_framework',
+
     'overthrow.games',
+    'overthrow.users',
 ]
 
 MIDDLEWARE = [

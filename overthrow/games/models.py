@@ -8,6 +8,8 @@ from django.db import models, transaction
 from django.db.models import Q, F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from mptt.models import MPTTModel
+from mptt.managers import TreeManager
 
 from . import coords
 from overthrow.utils import UUIDModel
@@ -83,7 +85,16 @@ class Game(UUIDModel):
         return pformat(self.as_plain())
 
 
-class Player(UUIDModel):
+class Corporation(UUIDModel):
+    pass
+
+
+class ExpliciteTreeManager(TreeManager):
+    def _get_next_tree_id(self):
+        return None
+
+
+class Player(UUIDModel, MPTTModel):
     game = models.ForeignKey(
         Game,
         on_delete=models.CASCADE,
@@ -94,6 +105,26 @@ class Player(UUIDModel):
         on_delete=models.CASCADE,
         related_name="+",
     )
+    corporation = models.ForeignKey(
+        Corporation,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='members',
+    )
+    boss = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='subordinates',
+    )
+
+    objects = ExpliciteTreeManager()
+
+    class MPTTMeta:
+        parent_attr = 'boss'
+        tree_id_attr = 'corporation'
 
     class Meta:
         constraints = [

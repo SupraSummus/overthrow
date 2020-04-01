@@ -9,6 +9,11 @@ class GameFactory(factory.django.DjangoModelFactory):
         model = models.Game
 
 
+class CorporationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = models.Corporation
+
+
 class PlayerFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = models.Player
