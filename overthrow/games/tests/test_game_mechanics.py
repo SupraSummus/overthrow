@@ -16,7 +16,6 @@ from overthrow.games.game_simulator import (
     ATTACK_TO_ATTACK_EFFICIENCY,
 )
 from overthrow.games.models import Tile, Movement, Player
-from overthrow.games.factories import CorporationFactory
 from overthrow.games.tests import strategies
 
 
@@ -159,8 +158,8 @@ class PossibilitiesTestCase(OSUrandomPatcher, TestCase):
         game=strategies.games(
             max_radius=1,
             unowned_tiles=False,
-            min_player_count=2,
-            max_player_count=2,
+            min_player_count=3,
+            max_player_count=3,
             min_movement_count=1,
             max_movement_count=1,
         ),
@@ -184,11 +183,10 @@ class PossibilitiesTestCase(OSUrandomPatcher, TestCase):
         expected_army = amount + next_tile.army
 
         # create management structure
-        boss, subordinate = tuple(game.players.all())
-        boss.corporation = CorporationFactory()
-        boss.save()
-        subordinate.boss = boss
-        subordinate.save()
+        boss, intermediate, subordinate = tuple(game.players.all())
+        boss.create_corporation()
+        intermediate.set_boss(boss)
+        subordinate.set_boss(intermediate)
 
         game.simulate()
 

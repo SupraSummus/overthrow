@@ -26,10 +26,13 @@ def zip_dicts(*dcts, default=None):
 
 class GameSimulator:
     def __init__(
-        self, tiles, movements,
+        self, tiles, movements, players,
     ):
         self.tiles_by_id = {tile.id: tile for tile in tiles}
         self.tiles_by_coords = {tile.coords: tile for tile in self.tiles_by_id.values()}
+
+        self.players_by_id = {player.id: player for player in players}
+        self._player_bosses = {}  # player id -> set of player ids
 
         self.movements_by_id = {}
         self.movements_by_path = {}  # (source id, target id) -> movement
@@ -145,10 +148,41 @@ class GameSimulator:
         return [m.id for m in self._movements_to_be_deleted.values()]
 
     def are_enemies(self, player_a_id, player_b_id):
-        return player_a_id != player_b_id
+        if player_a_id == player_b_id:
+            return False
+        if player_a_id is None or player_b_id is None:
+            return True
+        if (
+            self.players_by_id[player_a_id].corporation_id is None
+            or self.players_by_id[player_b_id].corporation_id is None
+        ):
+            return True
+        return (
+            self.players_by_id[player_a_id].corporation_id
+            != self.players_by_id[player_b_id].corporation_id
+        )
 
     def is_transfer_possible(self, player_a_id, player_b_id):
-        return player_a_id == player_b_id
+        """ Whether armies can be transfered from player_a to player_b """
+        return (
+            player_a_id == player_b_id
+            or player_b_id in self.get_player_bosses(player_a_id)
+            or player_a_id in self.get_player_bosses(player_b_id)
+        )
+
+    def get_player_bosses(self, player_id):
+        if player_id is None:
+            return set()
+
+        if player_id not in self._player_bosses:
+            bosses = set()
+            player = self.players_by_id[player_id]
+            while player.boss_id is not None:
+                bosses.add(player.boss_id)
+                player = self.players_by_id[player.boss_id]
+            self._player_bosses[player_id] = bosses
+
+        return self._player_bosses[player_id]
 
     def simulate(self):
         self.simulate_battles()
@@ -188,7 +222,9 @@ class GameSimulator:
                 sum(
                     amount
                     for source_tile_id, amount in attacking_armies.items()
-                    if self.tiles_by_id[source_tile_id].owner_id != tile.owner_id
+                    if self.are_enemies(
+                        self.tiles_by_id[source_tile_id].owner_id, tile.owner_id
+                    )
                 )
                 * ATTACK_TO_DEFENSE_EFFICIENCY
             )
@@ -198,7 +234,7 @@ class GameSimulator:
                 self.tiles_to_be_updated.add(tile_id)
                 for source_tile_id, amount in attacking_armies.items():
                     source_tile = self.tiles_by_id[source_tile_id]
-                    if source_tile.owner_id != tile.owner_id:
+                    if self.are_enemies(source_tile.owner_id, tile.owner_id):
                         attacking_armies[source_tile_id] -= force / losses * amount
 
         # calculate attacker losses
@@ -224,7 +260,7 @@ class GameSimulator:
                     )
                     for player_id, dealing_army in attacking_armies_by_player.items()
                     if (
-                        player_id != source_tile.owner_id
+                        self.are_enemies(player_id, source_tile.owner_id)
                         and attacking_armies_sum - dealing_army > 0
                     )
                 )
@@ -235,7 +271,7 @@ class GameSimulator:
                     - attacking_armies_by_player[target_tile.owner_id]
                 )
                 if (
-                    source_tile.owner_id != target_tile.owner_id
+                    self.are_enemies(source_tile.owner_id, target_tile.owner_id)
                     and defenders_defending_against > 0
                 ):
                     deaths += (

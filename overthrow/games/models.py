@@ -8,8 +8,6 @@ from django.db import models, transaction
 from django.db.models import Q, F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from mptt.models import MPTTModel
-from mptt.managers import TreeManager
 
 from . import coords
 from overthrow.utils import UUIDModel
@@ -42,11 +40,12 @@ class Game(UUIDModel):
         from overthrow.games.game_simulator import GameSimulator
 
         # lock and retrieve needed objects
-        tiles = list(Tile.objects.filter(game=self).select_for_update())
+        tiles = list(self.tiles.select_for_update())
         movements = list(Movement.objects.filter(source__game=self).select_for_update())
+        players = list(self.players.all())
 
         # simulate
-        simulator = GameSimulator(tiles, movements)
+        simulator = GameSimulator(tiles, movements, players)
         simulator.simulate()
 
         # save new state
@@ -90,12 +89,7 @@ class Corporation(UUIDModel):
     pass
 
 
-class ExpliciteTreeManager(TreeManager):
-    def _get_next_tree_id(self):
-        return None
-
-
-class Player(UUIDModel, MPTTModel):
+class Player(UUIDModel):
     game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="players",)
     user = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name="+",
@@ -115,16 +109,25 @@ class Player(UUIDModel, MPTTModel):
         related_name="subordinates",
     )
 
-    objects = ExpliciteTreeManager()
-
     class MPTTMeta:
         parent_attr = "boss"
         tree_id_attr = "corporation"
+        tree_id_attr_in_db = "corporation_id"
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["game", "user"], name="unique_player"),
         ]
+
+    def create_corporation(self):
+        assert self.corporation is None and self.boss is None
+        self.corporation = Corporation.objects.create()
+        self.save()
+
+    def set_boss(self, new_boss):
+        self.corporation_id = new_boss.corporation_id
+        self.boss = new_boss
+        self.save()
 
     @transaction.atomic
     def grant_initial_tiles(self, tile_count, army):
@@ -149,6 +152,16 @@ class Player(UUIDModel, MPTTModel):
             tile.army = army
         Tile.objects.bulk_update(granted_tiles, ["owner", "army"])
         return granted_tiles
+
+    def as_plain(self):
+        return {
+            "id": self.id,
+            "boss": self.boss_id,
+            "corporation": self.corporation_id,
+        }
+
+    def __repr__(self):
+        return pformat(self.as_plain())
 
 
 class Tile(UUIDModel):

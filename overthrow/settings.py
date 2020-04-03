@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.staticfiles",
     "corsheaders",
-    "mptt",
     "rest_framework_recaptcha",
     "rest_framework.authtoken",
     "rest_framework",
