@@ -13,16 +13,25 @@ It has positive properties:
 
 ## How?
 
-Overthrow mechanics are simple:
- * Turns are "parallel" - every player give orders, then all of them are executed at the same time.
+World setting
  * Map is composed of hexagonal tiles.
- * Each map tile produces set amount of army each turn for its owner.
- * Players can command armies to move across the map.
- * Armies fight with each other dealing proportional amount of damage each turn.
- * Players are limited in amount of armies they can move each turn. This forces them to cooperate.
- * Players can join "corporations" with tree-like management structure.
- * Players can leave and rearrange their coreporation's structure.
- * Armies and tiles can be transfered between players in single corporation. This consumes players' "actions per turn" capital.
+ * Each tile has owner (player).
+ * Each tile has some armies on it (sometimes 0. Army count is capped to max CP count that players can accumulate.
+ * Each map tile increases it's resources each turn. Growth is logarithmic (the more resources, the slower the growth). Resources are "potential for armies", and can be converted into armies by players.
+
+Battle mechanics
+ * Turns are "parallel" - every player give orders, then all of them are executed at the same time.
+ * Players are limited in "command points" (CPs) they can expend each turn.
+ * Unused "command points" accumulate up to set cap. This ensures one can be idle for limited amount of time without much loss.
+ * Players can convert tile resources to armies. This costs them proportional amount of "command points".
+ * Players can command armies to move across the map. Movement of each army by one tile costs the army owner one CP.
+ * Armies of opposing sides fight with each other dealing proportional amount of damage each turn. Fighting with enemy costs one CP for each attacking army.
+
+Cooperation mechanics
+ * Player can join "corporations" with tree-like management structure.
+ * Player can detach from corportation as she wish, taking whole subtree with her.
+ * Player can rearrange their subtree (including the player) of corporation's structure.
+ * Armies and tiles can be transfered between players in single corporation, up or down management structure. No non-tree transfers. This consumes players' CP capital.
 
 ## Installation
 
