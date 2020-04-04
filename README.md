@@ -44,3 +44,13 @@ Cooperation mechanics
     ./manage.py migrate
 
     ./manage.py runserver
+
+## Build for production
+
+In `frontend` dir
+
+    npm run build
+
+In root dir
+
+    python -m whitenoise.compress frontend/dist

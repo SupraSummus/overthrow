@@ -35,13 +35,13 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 # Application definition
 
 INSTALLED_APPS = [
+    "whitenoise.runserver_nostatic",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.messages",
     "django.contrib.sessions",
     "django.contrib.staticfiles",
-    "corsheaders",
     "rest_framework_recaptcha",
     "rest_framework.authtoken",
     "rest_framework",
@@ -52,8 +52,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "overthrow.delay_middleware.DelayMiddleware",  # For testing. Enabled by setting SLEEP_TIME [s].
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -120,7 +120,16 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
-STATIC_URL = "/static/"
+STATIC_URL = "/"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+WHITENOISE_ROOT = os.path.join(BASE_DIR, "frontend", "dist")
+WHITENOISE_INDEX_FILE = True
+
+
+def WHITENOISE_IMMUTABLE_FILE_TEST(path, url):
+    # only index.html is mutable
+    return url != "/"
+
 
 # we are using custom user model
 AUTH_USER_MODEL = "users.User"
@@ -131,10 +140,6 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
     ]
 }
-
-# CORS policy
-CORS_ORIGIN_ALLOW_ALL = True
-CORS_URLS_REGEX = r"^/api/.*$"
 
 # delay for testing
 SLEEP_TIME = env.int("SLEEP_TIME", default=0)

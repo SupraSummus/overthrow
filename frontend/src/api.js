@@ -1,7 +1,6 @@
 import store from "./store";
 
-const api_port = 8000;
-const api_url = `${window.location.protocol}//${window.location.hostname}:${api_port}/api/`;
+const api_url = "/api/";
 
 class APIClientError extends Error {
   constructor(response, ...params) {
