@@ -121,9 +121,9 @@ impl Bot for GreedyBot {
             }
 
             let enemy_next_door = hex.neighbors().any(|(_, n)| {
-                state.tile(n).map_or(false, |t| {
-                    t.owner.is_some() && t.owner != Some(me) && t.army > 0
-                })
+                state
+                    .tile(n)
+                    .is_some_and(|t| t.owner.is_some_and(|o| o != me) && t.army > 0)
             });
 
             // Recruit when threatened, or whenever a tile has piled up
