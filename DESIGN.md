@@ -13,45 +13,23 @@ small, discrete action space.
 
 ## Ruleset (v1, implemented in `engine/`)
 
-World
-- Hexagonal map of radius `R` (3R²+3R+1 tiles), cube coordinates.
-- A tile has: owner (or neutral), army count, resource count.
-- Every tile grows resources each turn:
-  `growth = max(1, (resource_cap − resources) / growth_divisor)` —
-  fast when poor, asymptotically slow near the cap. This is the
-  anti-snowball mechanic: a big empire's tiles are rich and grow slowly,
-  a recovering player's tiles grow quickly.
+`engine/src/game.rs` is the source of truth for the mechanics and their
+constants: `Config` documents every rule knob and its default, `Order`
+the two order kinds and the one-order-per-source-tile rule,
+`GameState::step` turn resolution and combat, `GameState::outcome`
+elimination and victory. Map geometry (hexagonal, cube coordinates) is
+`engine/src/coords.rs`. This doc doesn't repeat any of that; it records
+the two cross-cutting intents no single item can show:
 
-Turns
-- Simultaneous: each player submits up to `orders_per_turn` orders
-  (default 3); all resolve in the same tick. This is the command-point
-  idea from the original design, discretized into an order budget.
-  Orders are taken in submitted order until the budget is spent;
-  illegal orders are dropped without consuming budget.
-- Orders (**at most one order per source tile per turn**, of either kind):
-  - **Move** `(tile, direction, all|half)` — send armies to an *adjacent*
-    tile.
-  - **Recruit** `(tile)` — convert all of a tile's resources into armies.
-- Resolution within a tick: all orders apply "at once" (departures leave,
-  recruits raise), then everything lands and fights, then resources grow.
-  The one-order-per-tile rule means recruited armies defend the same turn
-  but cannot move until the next turn.
-
-Combat (single-step, deterministic)
-- All armies arriving on a tile plus its garrison form per-player parties.
-- The defender's party — garrison plus any same-owner arrivals — gets a
-  defense bonus (default 1.25×).
-- The strongest party survives, paying the summed effective strength of
-  all other parties; ties annihilate everyone. Survivors are converted
-  back from effective to actual units, rounding down.
-
-Victory
-- A player with no tiles is eliminated.
-- At `max_turns`, most tiles wins; ties are draws.
-
-Players
-- 2 to 6, one map corner each (opposite corners for 2, evenly spread as
-  the six corners allow otherwise). Neutral tiles never hold armies.
+- The resource growth curve (`Config::growth_divisor`) is the
+  anti-snowball mechanic at the empire scale: a big empire's tiles sit
+  near the cap and grow slowly, while a recovering player's poor tiles
+  grow quickly — losing ground speeds your economy up instead of
+  ending the game.
+- The flat order budget (`Config::orders_per_turn`) is the original
+  design's command-point idea discretized: order quality over click
+  speed, without the earn/accumulate/spend bookkeeping (see the table
+  below).
 
 ## Differences from the original (old/README.md) and why
 
