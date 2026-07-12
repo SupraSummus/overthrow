@@ -8,8 +8,8 @@
 use std::env;
 use std::process::exit;
 
-use overthrow_bot::{make_bot, run_match, Bot};
-use overthrow_engine::{Config, GameState, Hex, Outcome, PlayerId};
+use overthrow_bot::{make_bot, run_match, Bot, SeriesStats};
+use overthrow_engine::{Config, GameState, Hex, PlayerId};
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -61,9 +61,7 @@ fn main() {
         ..Config::default()
     };
 
-    let mut wins = [0u32; 2];
-    let mut draws = 0u32;
-    let mut total_turns = 0u64;
+    let mut stats = SeriesStats::default();
 
     for game_index in 0..games {
         let game_seed = seed + game_index as u64;
@@ -80,19 +78,13 @@ fn main() {
             })
             .collect();
 
-        let (state, outcome) = run_match(config.clone(), &mut players);
-
-        total_turns += state.turn as u64;
-        match outcome {
-            Outcome::Winner(PlayerId(p)) => wins[p as usize] += 1,
-            Outcome::Draw => draws += 1,
-            Outcome::Ongoing => unreachable!(),
-        }
+        let (state, record) = run_match(config.clone(), &mut players);
+        stats.record(&record);
 
         if render {
             println!(
                 "game {game_index}: {:?} after {} turns  ({} vs {})",
-                outcome, state.turn, bots.0, bots.1
+                record.outcome, state.turn, bots.0, bots.1
             );
             print_map(&state);
         }
@@ -103,11 +95,15 @@ fn main() {
         games,
         radius,
         bots.0,
-        wins[0],
+        stats.wins_of(PlayerId(0)),
         bots.1,
-        wins[1],
-        draws,
-        total_turns / games.max(1) as u64,
+        stats.wins_of(PlayerId(1)),
+        stats.draws,
+        stats.avg_turns(),
+    );
+    println!(
+        "endings: {} by elimination, {} at the turn limit; comebacks: {} of {} decided games with an early leader",
+        stats.eliminations, stats.turn_limit_endings, stats.comebacks, stats.comeback_eligible,
     );
 }
 

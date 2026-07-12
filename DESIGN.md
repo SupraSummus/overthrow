@@ -42,16 +42,60 @@ the two cross-cutting intents no single item can show:
 | Corporations, boss trees, transfers | Omitted | Out of scope for single-player vs AI (deliberate decision, 2026-07) |
 | Army cap tied to CP cap | No cap | Keep constants minimal; revisit if unbounded stacks distort play |
 
-## Observed behavior (bot-vs-bot, defaults)
+## How we know it works as a game
 
-- `greedy` beats `random` 200/200 on radius 5, avg ~86 turns.
-- Mirror matches (`greedy,greedy`, `random,random`) are ~50/50 with no
-  first-player advantage — the setup is symmetric and turns are truly
-  simultaneous.
-- `greedy` mirrors usually hit `max_turns` (turtling stalemate). Expected
-  with a defense bonus and no economic pressure to attack; worth revisiting
-  once a real frontend or smarter bots exist. Possible levers: victory by
-  resource share, decay on huge stacks, or attack efficiency scaling.
+The natural way to judge "this really plays like a game" is to watch it —
+render a bot match and eyeball the map evolving. That judgment is real but
+it doesn't reproduce: it isn't seeded, isn't quantified, can't be compared
+across commits, and nobody re-watches after every rule tweak, so it drifts
+silently. The goal here is to decompose that eyeball judgment into
+indicators that are **deterministic** (everything is seeded — a failure
+replays exactly), **quantified**, and **tied to the design goals** above,
+so a rule change that breaks a goal fails a named test instead of a vibe.
+(Only the measurable goals get a proxy — "no APM pressure" and "simple
+rules" are structural properties of the ruleset, not test subjects.)
+
+Two layers, split by what they can claim:
+
+- **Engine correctness** — necessary but not sufficient; a game can be
+  bug-free and still be a bad game. `engine/tests/invariants.rs` checks
+  properties that must hold in *every* reachable state of *any* game
+  (including under garbage orders), that equal seeds replay to identical
+  states (`GameState::state_hash`), and pins one golden game as a change
+  detector.
+- **Gameplay health** — proxies for the design goals, measured over
+  seeded bot series. Metric definitions live in `bot/src/stats.rs`
+  (`MatchRecord`, `SeriesStats`); `bot/tests/health.rs` asserts one loose
+  threshold per goal; the CLI prints the same metrics for ad-hoc runs.
+  The mapping: *strategy matters* → `greedy` dominates `random`, by
+  elimination rather than turn-limit adjudication; *fairness /
+  simultaneity* → seat-swap invariance and ~50/50 mirrors; *no
+  snowball* → the comeback rate (`MatchRecord::comeback`: how often the
+  quarter-mark tile leader loses anyway).
+
+Known limits, so the numbers aren't over-trusted: these are proxies, not
+proof the game is *fun*; the bots bound what the metrics can see (`random`
+can't punish anything, `greedy` turtles), so the indicators sharpen as the
+opponents do — the RL phase feeds directly back into this suite.
+Thresholds are deliberately loose change-detectors, not balance pins.
+Eyeballing rendered games remains a legitimate tool — just run it from a
+fixed `--seed` so what was seen can be seen again.
+
+## Observed behavior (bot-vs-bot, radius 5, defaults)
+
+- `greedy` beats `random` 200/200, avg ~89 turns, every win by
+  elimination.
+- Mirror matches are ~50/50 with no first-player advantage — the setup is
+  symmetric and turns are truly simultaneous.
+- *Both* mirrors always hit `max_turns` and get decided by tile-count
+  adjudication, never elimination. For `random` mirrors the quarter-mark
+  lead barely predicts the winner (comeback rate ~42%); for `greedy`
+  mirrors it predicted all 186 decided games (0 comebacks) — under a
+  turtling stalemate the early tile lead is exactly what adjudication
+  rewards. Expected with a defense bonus and no economic pressure to
+  attack; worth revisiting once a real frontend or smarter bots exist.
+  Possible levers: victory by resource share, decay on huge stacks, or
+  attack efficiency scaling.
 
 ## ML plan (next phases)
 

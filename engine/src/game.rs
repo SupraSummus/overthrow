@@ -177,6 +177,31 @@ impl GameState {
             .sum()
     }
 
+    /// FNV-1a hash of the observable state: the turn counter plus every
+    /// tile (owner, army, resources) in canonical map order. Stable across
+    /// processes, platforms and Rust versions, so equal hashes from equal
+    /// seeds are a meaningful determinism check (see
+    /// `engine/tests/invariants.rs`), and RL code can later use it for
+    /// transposition tables.
+    pub fn state_hash(&self) -> u64 {
+        let mut hash: u64 = 0xcbf29ce484222325;
+        let mut mix = |value: u64| {
+            for byte in value.to_le_bytes() {
+                hash = (hash ^ byte as u64).wrapping_mul(0x100000001b3);
+            }
+        };
+        mix(self.turn as u64);
+        for tile in &self.tiles {
+            mix(match tile.owner {
+                Some(PlayerId(p)) => p as u64 + 1,
+                None => 0,
+            });
+            mix(tile.army as u64);
+            mix(tile.resources as u64);
+        }
+        hash
+    }
+
     pub fn outcome(&self) -> Outcome {
         // One pass over the board; everything below derives from the counts.
         let mut counts = vec![0u32; self.config.players as usize];
@@ -623,37 +648,5 @@ mod tests {
         }
         let cap = s.config.resource_cap;
         assert!(s.iter_tiles().all(|(_, t)| t.resources == cap));
-    }
-
-    #[test]
-    fn random_games_terminate_and_stay_consistent() {
-        use crate::rng::Rng;
-        let mut rng = Rng::new(42);
-        for _ in 0..5 {
-            let mut s = GameState::new(Config {
-                max_turns: 200,
-                ..small_config()
-            });
-            loop {
-                let orders: Vec<Vec<Order>> = (0..s.config.players)
-                    .map(|p| {
-                        let legal = s.legal_orders(PlayerId(p));
-                        (0..s.config.orders_per_turn)
-                            .filter_map(|_| {
-                                if legal.is_empty() {
-                                    None
-                                } else {
-                                    Some(legal[rng.below(legal.len())])
-                                }
-                            })
-                            .collect()
-                    })
-                    .collect();
-                if s.step(&orders) != Outcome::Ongoing {
-                    break;
-                }
-                assert!(s.turn <= 200, "game must terminate by max_turns");
-            }
-        }
     }
 }
