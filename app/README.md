@@ -31,6 +31,10 @@ browsers refuse to fetch `.wasm` from the filesystem.
 (not-fl3.github.io/miniquad-samples);
 re-vendor it from there to update.
 
+The steps above are for local iteration;
+pushes to `main` build this target and publish it to GitHub Pages
+through [`.github/workflows/pages.yml`](../.github/workflows/pages.yml).
+
 ## Android
 
 Packaged with [`cargo-apk`](https://github.com/rust-mobile/cargo-apk),

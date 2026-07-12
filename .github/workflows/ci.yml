@@ -23,6 +23,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
 
@@ -34,3 +35,8 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --locked
+
+      # Guard the web target that pages.yml deploys: without this, a wasm-only
+      # break merges green and only surfaces when the deploy fails on main.
+      - name: Build web (WebAssembly)
+        run: cargo build -p overthrow-app --release --target wasm32-unknown-unknown --locked

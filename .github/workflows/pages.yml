@@ -1,0 +1,61 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Allow the deploy job to publish to Pages; the token is otherwise read-only.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One live deployment at a time; let an in-flight run finish rather than
+# cancelling it, so a half-published site is never left behind.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build web (WebAssembly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build wasm
+        run: cargo build -p overthrow-app --release --target wasm32-unknown-unknown --locked
+
+      # Serve the committed page shell and JS loader alongside the freshly
+      # built .wasm; the filename must match the load() call in index.html.
+      - name: Assemble site
+        run: |
+          mkdir -p dist
+          cp app/index.html app/mq_js_bundle.js dist/
+          cp target/wasm32-unknown-unknown/release/overthrow-app.wasm dist/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

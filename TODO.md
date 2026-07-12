@@ -29,4 +29,14 @@ drawn in the HUD and hit-tested like tiles,
 so every action has a pointer path;
 keep the key bindings as desktop shortcuts.
 
+`.cargo/config.toml` passes `--allow-undefined` to `wasm-ld` so the
+macroquad web build links under Rust 1.96+,
+which stopped importing undefined symbols by default.
+It is a workaround for miniquad not yet annotating its JS/GL imports with
+`#[link(wasm_import_module = ...)]`.
+Next move: once a released miniquad (via `macroquad`) carries those
+annotations, bump the dependency and delete `.cargo/config.toml` —
+the flag masks genuinely missing symbols, so drop it as soon as upstream
+makes it unnecessary.
+
 `Rng::below` in `engine/src/rng.rs` documents "uniform value in `0..bound`" but computes `next_u64() % bound`, which is modulo-biased for bounds that don't divide 2^64 — negligible at the tiny bounds the bot shuffles use, but the doc overpromises. Next move: either soften the doc to say the bias is accepted, or debias (rejection sampling / Lemire); prefer the latter before anything RL-side starts drawing from this RNG, since it would silently skew exploration.

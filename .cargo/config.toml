@@ -1,0 +1,9 @@
+# macroquad/miniquad imports its GL and JS glue (glBindTexture, console_log,
+# …) as undefined wasm symbols resolved at load time by mq_js_bundle.js.
+# Rust 1.96 stopped passing --allow-undefined to wasm-ld by default, so those
+# imports now fail to link; pass it back until miniquad annotates them with
+# #[link(wasm_import_module = ...)] upstream. Scoped to the wasm target, so
+# native builds are unaffected.
+# See https://blog.rust-lang.org/2026/04/04/changes-to-webassembly-targets-and-handling-undefined-symbols/
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--allow-undefined"]
