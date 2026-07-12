@@ -1,16 +1,26 @@
-//! Playable macroquad frontend: a human (player A) versus a scripted bot.
+//! Playable macroquad frontend: a human plays a bot, or two bots play
+//! each other while you watch.
 //!
 //! The same crate builds to native desktop, web (wasm32) and Android;
 //! see `app/README.md` for the per-target build commands.
 //! All game logic comes from `overthrow-engine`;
 //! this file is input, layout and drawing only.
 //!
-//! Controls: left-click one of your tiles to select it,
+//! The app runs in one of two modes:
+//! *play* (a human is player A, a bot plays B) and
+//! *spectate* (both players are bots and the game plays itself,
+//! for watching a bot-vs-bot match).
+//! `H` starts a fresh play game, `B` a fresh bot-vs-bot game,
+//! `N` restarts the current mode; these work in either mode.
+//!
+//! Play controls: left-click one of your tiles to select it,
 //! then left-click an adjacent tile to queue a move
 //! (hold Shift for a half-move);
 //! right-click a tile (or press R while it's selected) to queue a recruit.
-//! Backspace undoes the last queued order, Enter ends the turn,
-//! N starts a new game.
+//! Backspace undoes the last queued order, Enter ends the turn.
+//!
+//! Spectate controls: Space pauses/resumes the auto-advancing match,
+//! `.` steps a single turn, and `[` / `]` slow down / speed up the pace.
 
 mod layout;
 
@@ -22,7 +32,14 @@ use overthrow_engine::{
 };
 
 const HUMAN: PlayerId = PlayerId(0);
+/// Bot the human faces in play mode (player B).
 const BOT_NAME: &str = "greedy";
+/// The two bots pitted against each other in spectate mode (players A, B).
+const SPECTATE_BOTS: [&str; 2] = ["greedy", "greedy"];
+/// Seconds each spectated turn is held on screen before the next resolves;
+/// `[` / `]` scale this within [`TURN_INTERVAL_RANGE`].
+const DEFAULT_TURN_INTERVAL: f32 = 0.6;
+const TURN_INTERVAL_RANGE: (f32, f32) = (0.05, 2.0);
 
 /// Distinct fill color per player id (index by `PlayerId.0`).
 const PLAYER_COLORS: [Color; 6] = [
@@ -38,27 +55,62 @@ const BG: Color = Color::new(0.09, 0.10, 0.12, 1.0);
 
 struct App {
     state: GameState,
-    bot: Box<dyn Bot>,
+    /// One slot per player; `None` is the human (player A in play mode),
+    /// `Some` a bot. A bot in slot A means we are spectating a bot-vs-bot game.
+    bots: [Option<Box<dyn Bot>>; 2],
     /// Human orders staged for the current turn (source-unique, CP-capped).
     pending: Vec<Order>,
     selected: Option<Hex>,
     seed: u64,
+    /// Spectate pacing: the match is held when `paused`, and auto-advances
+    /// once `timer` reaches `turn_interval` (all inert in play mode).
+    paused: bool,
+    timer: f32,
+    turn_interval: f32,
 }
 
 impl App {
-    fn new(seed: u64) -> Self {
+    fn new(seed: u64, spectate: bool) -> Self {
+        // Distinct sub-seeds per bot so two greedies don't play in lockstep.
+        let bots = if spectate {
+            [
+                Some(make_bot(SPECTATE_BOTS[0], seed.wrapping_mul(2)).expect("known bot")),
+                Some(make_bot(SPECTATE_BOTS[1], seed.wrapping_mul(2) + 1).expect("known bot")),
+            ]
+        } else {
+            [
+                None,
+                Some(make_bot(BOT_NAME, seed.wrapping_mul(2) + 1).expect("known bot")),
+            ]
+        };
         App {
             state: GameState::new(Config::default()),
-            bot: make_bot(BOT_NAME, seed.wrapping_mul(2) + 1).expect("known bot"),
+            bots,
             pending: Vec::new(),
             selected: None,
             seed,
+            paused: false,
+            timer: 0.0,
+            turn_interval: DEFAULT_TURN_INTERVAL,
         }
     }
 
+    /// Restart in the same mode with the next seed, so successive games differ.
     fn restart(&mut self) {
-        let next = self.seed.wrapping_add(1);
-        *self = App::new(next);
+        *self = App::new(self.seed.wrapping_add(1), self.spectating());
+    }
+
+    /// True when player A is a bot, i.e. we are watching a bot-vs-bot match.
+    fn spectating(&self) -> bool {
+        self.bots[HUMAN.0 as usize].is_some()
+    }
+
+    /// Display name for player `p`: the bot's name, or "you" for the human.
+    fn player_label(&self, p: usize) -> &'static str {
+        match &self.bots[p] {
+            Some(bot) => bot.name(),
+            None => "you",
+        }
     }
 
     /// Command points the staged orders will spend (see `GameState::step`).
@@ -84,15 +136,22 @@ impl App {
         }
     }
 
-    /// Resolve one turn: human's staged orders plus the bot's, then advance.
-    fn end_turn(&mut self) {
+    /// Resolve one turn: each player's orders (a bot's, or the human's staged
+    /// pending in play mode), then advance and reset the spectate timer.
+    fn advance_turn(&mut self) {
         if self.state.outcome() != Outcome::Ongoing {
             return;
         }
-        let bot_orders = self.bot.orders(&self.state, PlayerId(1));
-        self.state
-            .step(&[std::mem::take(&mut self.pending), bot_orders]);
+        let mut orders: Vec<Vec<Order>> = Vec::with_capacity(self.bots.len());
+        for (p, slot) in self.bots.iter_mut().enumerate() {
+            orders.push(match slot {
+                Some(bot) => bot.orders(&self.state, PlayerId(p as u8)),
+                None => std::mem::take(&mut self.pending),
+            });
+        }
+        self.state.step(&orders);
         self.selected = None;
+        self.timer = 0.0;
     }
 
     fn handle_click(&mut self, hex: Hex) {
@@ -139,9 +198,28 @@ impl App {
 
     /// Dispatch this frame's mouse and keyboard input onto the game.
     fn handle_input(&mut self, layout: &Layout, hud_h: f32) {
+        // Mode / new-game keys work in either mode and any game state.
         if is_key_pressed(KeyCode::N) {
             self.restart();
+            return;
         }
+        if is_key_pressed(KeyCode::B) {
+            *self = App::new(self.seed.wrapping_add(1), true);
+            return;
+        }
+        if is_key_pressed(KeyCode::H) {
+            *self = App::new(self.seed.wrapping_add(1), false);
+            return;
+        }
+        if self.spectating() {
+            self.handle_spectate_input();
+        } else {
+            self.handle_play_input(layout, hud_h);
+        }
+    }
+
+    /// Play mode: mouse selection/moves, recruit, undo, end turn.
+    fn handle_play_input(&mut self, layout: &Layout, hud_h: f32) {
         if self.state.outcome() != Outcome::Ongoing {
             return;
         }
@@ -162,7 +240,35 @@ impl App {
             self.pending.pop();
         }
         if is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::Space) {
-            self.end_turn();
+            self.advance_turn();
+        }
+    }
+
+    /// Spectate mode: pause/resume, single-step, and pace control.
+    fn handle_spectate_input(&mut self) {
+        if is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter) {
+            self.paused = !self.paused;
+        }
+        if is_key_pressed(KeyCode::Period) {
+            self.advance_turn();
+        }
+        if is_key_pressed(KeyCode::LeftBracket) {
+            self.turn_interval = (self.turn_interval * 1.5).min(TURN_INTERVAL_RANGE.1);
+        }
+        if is_key_pressed(KeyCode::RightBracket) {
+            self.turn_interval = (self.turn_interval / 1.5).max(TURN_INTERVAL_RANGE.0);
+        }
+    }
+
+    /// Advance a spectated match on its own clock; a no-op in play mode,
+    /// when paused, or once the game is over.
+    fn tick(&mut self, dt: f32) {
+        if !self.spectating() || self.paused || self.state.outcome() != Outcome::Ongoing {
+            return;
+        }
+        self.timer += dt;
+        if self.timer >= self.turn_interval {
+            self.advance_turn(); // resets the timer
         }
     }
 }
@@ -296,36 +402,54 @@ fn draw_hud(app: &App) -> f32 {
     );
 
     let s = &app.state;
-    let you = s.tile_count(HUMAN);
-    let foe = s.tile_count(PlayerId(1));
     let line1 = format!(
-        "Turn {}/{}    You (A): {} tiles, {} army    {} (B): {} tiles, {} army",
+        "Turn {}/{}    A [{}]: {} tiles, {} army    B [{}]: {} tiles, {} army",
         s.turn,
         s.config.max_turns,
-        you,
-        s.army_total(HUMAN),
-        BOT_NAME,
-        foe,
+        app.player_label(0),
+        s.tile_count(PlayerId(0)),
+        s.army_total(PlayerId(0)),
+        app.player_label(1),
+        s.tile_count(PlayerId(1)),
         s.army_total(PlayerId(1)),
     );
     draw_text(&line1, 14.0, 26.0, 22.0, WHITE);
 
-    let line2 = format!(
-        "CP {}/{}    Shift+click = half-move",
-        app.pending_cp(),
-        s.config.command_points,
-    );
-    draw_text(&line2, 14.0, 50.0, 18.0, Color::new(1.0, 1.0, 1.0, 0.8));
-
-    let hint = "L-click: select / move   R-click or R: recruit   Backspace: undo   Enter: end turn   N: new game";
-    draw_text(hint, 14.0, 72.0, 16.0, Color::new(1.0, 1.0, 1.0, 0.6));
+    let dim = Color::new(1.0, 1.0, 1.0, 0.8);
+    let dimmer = Color::new(1.0, 1.0, 1.0, 0.6);
+    let (line2, hint) = if app.spectating() {
+        let status = if s.outcome() != Outcome::Ongoing {
+            "game over".to_string()
+        } else if app.paused {
+            "paused".to_string()
+        } else {
+            format!("playing, {:.2}s/turn", app.turn_interval)
+        };
+        (
+            format!("Bot vs bot — {status}"),
+            "Space: pause   .: step   [ ]: slower/faster   H: play vs bot   N: new match",
+        )
+    } else {
+        (
+            format!(
+                "CP {}/{}    Shift+click = half-move",
+                app.pending_cp(),
+                s.config.command_points,
+            ),
+            "L-click: select / move   R-click or R: recruit   Backspace: undo   Enter: end turn   N: new   B: watch bots",
+        )
+    };
+    draw_text(&line2, 14.0, 50.0, 18.0, dim);
+    draw_text(hint, 14.0, 72.0, 16.0, dimmer);
 
     // Outcome banner when the game is over.
     match s.outcome() {
         Outcome::Ongoing => {}
         result => {
             let msg = match result {
-                Outcome::Winner(HUMAN) => "You win!  —  press N for a new game".to_string(),
+                Outcome::Winner(HUMAN) if !app.spectating() => {
+                    "You win!  —  press N for a new game".to_string()
+                }
                 Outcome::Winner(PlayerId(p)) => {
                     format!(
                         "Player {} wins  —  press N for a new game",
@@ -387,12 +511,13 @@ fn draw_map(app: &App, layout: &Layout) {
 async fn main() {
     // Seed is fixed (no wall-clock dependency, matching the engine's style);
     // restarting advances it so successive games differ.
-    let mut app = App::new(1);
+    let mut app = App::new(1, false);
     loop {
         clear_background(BG);
         let hud_h = draw_hud(&app);
         let layout = fit_layout(&app.state, hud_h);
         app.handle_input(&layout, hud_h);
+        app.tick(get_frame_time());
         draw_map(&app, &layout);
         next_frame().await;
     }
