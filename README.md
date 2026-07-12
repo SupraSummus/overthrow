@@ -24,7 +24,8 @@ preserved under [`old/`](old/) as a reference implementation.
 - `bot/` — opponents implementing the `Bot` trait: `random` (baseline) and
   `greedy` (scripted heuristic). A learned policy bot will slot in here.
 - `cli/` — headless runner for bot-vs-bot matches.
-- `app/` — playable [macroquad](https://macroquad.rs) frontend (human vs bot).
+- `app/` — playable [macroquad](https://macroquad.rs) frontend
+  (human vs bot, or spectating a bot-vs-bot match).
   The one crate builds to native desktop, web (WebAssembly) and Android;
   see [`app/README.md`](app/README.md) for the per-target build commands.
 

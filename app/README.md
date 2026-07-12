@@ -1,6 +1,7 @@
 # overthrow-app
 
-Playable macroquad frontend: a human (player A) versus a scripted bot.
+Playable macroquad frontend: a human (player A) versus a scripted bot,
+or a bot-vs-bot match played out for you to watch.
 One crate, three build targets
 — native desktop, web (WebAssembly) and Android —
 all linking `overthrow-engine` and `overthrow-bot` directly,
