@@ -1,0 +1,8 @@
+[package]
+name = "overthrow-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "overthrow_engine"

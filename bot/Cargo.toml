@@ -1,0 +1,11 @@
+[package]
+name = "overthrow-bot"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "overthrow_bot"
+
+[dependencies]
+overthrow-engine = { path = "../engine" }
