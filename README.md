@@ -21,6 +21,9 @@ preserved under [`old/`](old/) as a reference implementation.
 - `bot/` — opponents implementing the `Bot` trait: `random` (baseline) and
   `greedy` (scripted heuristic). A learned policy bot will slot in here.
 - `cli/` — headless runner for bot-vs-bot matches.
+- `app/` — playable [macroquad](https://macroquad.rs) frontend (human vs bot).
+  The one crate builds to native desktop, web (WebAssembly) and Android;
+  see [`app/README.md`](app/README.md) for the per-target build commands.
 
 ## Usage
 
@@ -32,7 +35,11 @@ preserved under [`old/`](old/) as a reference implementation.
 ## Roadmap
 
 1. ✅ Pure engine with simplified ruleset + scripted bots + headless CLI
-2. Playable desktop frontend (Bevy or macroquad; same codebase later
-   packages for Android)
+2. ✅ Playable frontend (`app/`, macroquad) —
+   the one crate targets native desktop, web (WebAssembly) and Android.
+   macroquad was chosen over Bevy because the game is graphically trivial
+   (colored hexes and numbers),
+   so immediate-mode drawing fits and the ECS machinery would be overhead;
+   it also covers web, which a native-only stack would not.
 3. RL self-play training (engine exposed to Python via PyO3, PPO policy,
    exported to ONNX, inference in-app via `tract`)

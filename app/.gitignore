@@ -1,0 +1,2 @@
+# Built wasm copied next to index.html for local serving (see README).
+/overthrow-app.wasm
