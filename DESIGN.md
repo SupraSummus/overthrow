@@ -71,7 +71,10 @@ Two layers, split by what they can claim:
   elimination rather than turn-limit adjudication; *fairness /
   simultaneity* → seat-swap invariance and ~50/50 mirrors; *no
   snowball* → the comeback rate (`MatchRecord::comeback`: how often the
-  quarter-mark tile leader loses anyway).
+  quarter-mark tile leader loses anyway) is the thresholded proxy, backed
+  by lead volatility (`MatchRecord::lead_changes`), an observed-only
+  companion that reads the whole trajectory instead of one point and so
+  catches a lead that stays locked in even when the finish is close.
 
 Known limits, so the numbers aren't over-trusted: these are proxies, not
 proof the game is *fun*; the bots bound what the metrics can see (`random`
@@ -89,13 +92,17 @@ fixed `--seed` so what was seen can be seen again.
   symmetric and turns are truly simultaneous.
 - *Both* mirrors always hit `max_turns` and get decided by tile-count
   adjudication, never elimination. For `random` mirrors the quarter-mark
-  lead barely predicts the winner (comeback rate ~42%); for `greedy`
-  mirrors it predicted all 186 decided games (0 comebacks) — under a
-  turtling stalemate the early tile lead is exactly what adjudication
-  rewards. Expected with a defense bonus and no economic pressure to
-  attack; worth revisiting once a real frontend or smarter bots exist.
-  Possible levers: victory by resource share, decay on huge stacks, or
-  attack efficiency scaling.
+  lead barely predicts the winner (comeback rate ~42%) and the lead
+  changes hands constantly (~17 times per game) — noisy play keeps the
+  race open. For `greedy` mirrors it predicted all 186 decided games (0
+  comebacks) and the lead barely moves (~0.7 changes per game over 500
+  turns): under a turtling stalemate whoever grabs the early tile lead
+  holds it to the adjudicated finish. Lead volatility quantifies that
+  turtling — a near-frozen lead over a full game, where the comeback rate
+  only sees the endpoints. Expected with a defense bonus and no economic
+  pressure to attack; worth revisiting once a real frontend or smarter
+  bots exist. Possible levers: victory by resource share, decay on huge
+  stacks, or attack efficiency scaling.
 
 ## ML plan (next phases)
 

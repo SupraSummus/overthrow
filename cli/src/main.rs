@@ -105,6 +105,11 @@ fn main() {
         "endings: {} by elimination, {} at the turn limit; comebacks: {} of {} decided games with an early leader",
         stats.eliminations, stats.turn_limit_endings, stats.comebacks, stats.comeback_eligible,
     );
+    println!(
+        "lead volatility: {:.1} lead changes per game ({} total)",
+        stats.avg_lead_changes(),
+        stats.total_lead_changes,
+    );
 }
 
 /// ASCII map: each tile is `<owner><army>`, owner A/B/. (neutral). Rows

@@ -61,6 +61,25 @@ impl MatchRecord {
     pub fn comeback(&self) -> Option<bool> {
         Some(self.winner()? != self.early_leader()?)
     }
+
+    /// How many times the tile-count lead changed hands over the game:
+    /// turns whose strict leader differs from the most recent earlier
+    /// turn that had one. Ties (`None`) are gaps, not changes — a lead
+    /// reclaimed by the same player after a tie doesn't count, one broken
+    /// by a *different* player does. The trajectory-wide companion to
+    /// `comeback`, which samples a single point; read at series scale by
+    /// `SeriesStats::avg_lead_changes`.
+    pub fn lead_changes(&self) -> u32 {
+        let mut changes = 0;
+        let mut held: Option<PlayerId> = None;
+        for leader in self.leaders.iter().flatten() {
+            if held.is_some_and(|h| h != *leader) {
+                changes += 1;
+            }
+            held = Some(*leader);
+        }
+        changes
+    }
 }
 
 /// Aggregated game-health metrics over a series of matches.
@@ -81,6 +100,9 @@ pub struct SeriesStats {
     /// Decided games that had a strict early leader — the denominator
     /// for the comeback rate.
     pub comeback_eligible: u32,
+    /// Total lead changes across every game (see
+    /// `MatchRecord::lead_changes`); averaged by `avg_lead_changes`.
+    pub total_lead_changes: u64,
     pub total_turns: u64,
 }
 
@@ -108,6 +130,7 @@ impl SeriesStats {
                 self.comebacks += 1;
             }
         }
+        self.total_lead_changes += record.lead_changes() as u64;
     }
 
     pub fn wins_of(&self, player: PlayerId) -> u32 {
@@ -116,6 +139,13 @@ impl SeriesStats {
 
     pub fn avg_turns(&self) -> u64 {
         self.total_turns / self.games.max(1) as u64
+    }
+
+    /// Mean lead changes per game — the series-level anti-snowball
+    /// trajectory proxy. Near zero means leads are locked in (snowball);
+    /// well above zero means the lead is genuinely contested.
+    pub fn avg_lead_changes(&self) -> f64 {
+        self.total_lead_changes as f64 / self.games.max(1) as f64
     }
 }
 
@@ -150,6 +180,23 @@ mod tests {
         // Tied at the quarter mark: no reference point, not eligible.
         let tied = vec![None, None, None, None, None, p0, p0, p0, p0];
         assert_eq!(record(Outcome::Winner(PlayerId(0)), tied).comeback(), None);
+    }
+
+    #[test]
+    fn lead_changes_count_leader_switches_treating_ties_as_gaps() {
+        let p0 = Some(PlayerId(0));
+        let p1 = Some(PlayerId(1));
+        let rec = |leaders| record(Outcome::Draw, leaders);
+        // Never-changing lead: a snowball trajectory.
+        assert_eq!(rec(vec![p0, p0, p0, p0]).lead_changes(), 0);
+        // A tie the same player reclaims is not a change.
+        assert_eq!(rec(vec![p0, None, p0]).lead_changes(), 0);
+        // A tie a different player breaks is one change.
+        assert_eq!(rec(vec![p0, None, p1]).lead_changes(), 1);
+        // Back and forth: A→B→A is two changes.
+        assert_eq!(rec(vec![None, p0, p1, p1, p0]).lead_changes(), 2);
+        // An all-tie game never has a leader, so nothing changes.
+        assert_eq!(rec(vec![None, None, None]).lead_changes(), 0);
     }
 
     #[test]
