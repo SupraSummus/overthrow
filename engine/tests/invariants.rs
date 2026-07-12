@@ -17,12 +17,13 @@ fn test_config() -> Config {
     }
 }
 
-/// Random legal orders for every player, `orders_per_turn` each.
+/// Random legal orders for every player: a candidate list roughly the size
+/// of the CP pool (the engine funds as many as the pool covers).
 fn random_legal_orders(state: &GameState, rng: &mut Rng) -> Vec<Vec<Order>> {
     (0..state.config.players)
         .map(|p| {
             let legal = state.legal_orders(PlayerId(p));
-            (0..state.config.orders_per_turn)
+            (0..state.config.command_points)
                 .filter_map(|_| {
                     if legal.is_empty() {
                         None
@@ -48,7 +49,7 @@ fn random_garbage_orders(state: &GameState, rng: &mut Rng) -> Vec<Vec<Order>> {
     };
     (0..state.config.players)
         .map(|_| {
-            (0..state.config.orders_per_turn + 2)
+            (0..state.config.command_points + 2)
                 .map(|_| {
                     let source = random_hex(rng);
                     if rng.below(4) == 0 {
@@ -176,4 +177,4 @@ fn golden_game_final_state_is_pinned() {
 }
 
 const GOLDEN_TURNS: u32 = 200;
-const GOLDEN_HASH: u64 = 82906542146445830;
+const GOLDEN_HASH: u64 = 10135845784850105762;

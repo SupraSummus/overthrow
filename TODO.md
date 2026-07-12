@@ -39,4 +39,19 @@ annotations, bump the dependency and delete `.cargo/config.toml` —
 the flag masks genuinely missing symbols, so drop it as soon as upstream
 makes it unnecessary.
 
+`GreedyBot` in `bot/src/lib.rs` scores an attack whenever
+`tile.army >= needed` and then issues `MoveAmount::All`,
+but under the per-army command-point pool a move ships only
+`min(army, remaining CP)` armies (`GameState::order_cost` / `step`),
+so an attack scored as winning can land under-strength and lose —
+greedy throws armies and CP at overruns it can't actually fund this turn.
+The scoring pass is blind to the pool because `take_budget` allocates CP
+only afterwards.
+Next move: fold the pool into scoring —
+walk candidates in priority order tracking remaining CP,
+and only commit an attack whose funded strength (`min(army, remaining)`)
+still clears `needed`, deferring or downgrading the rest.
+Behavior change (greedy plays differently), so it needs sign-off and a
+fresh `bot/tests/health.rs` check.
+
 `Rng::below` in `engine/src/rng.rs` documents "uniform value in `0..bound`" but computes `next_u64() % bound`, which is modulo-biased for bounds that don't divide 2^64 — negligible at the tiny bounds the bot shuffles use, but the doc overpromises. Next move: either soften the doc to say the bias is accepted, or debias (rejection sampling / Lemire); prefer the latter before anything RL-side starts drawing from this RNG, since it would silently skew exploration.

@@ -1,10 +1,13 @@
 //! Game state and simultaneous-turn resolution.
 //!
-//! This is a deliberately simplified ruleset compared to the original design
-//! in `old/README.md` — see `DESIGN.md` at the repo root for the rationale.
-//! The key simplifications: orders only move armies to *adjacent* tiles, each
-//! player gets a fixed number of orders per turn, and combat resolves in a
-//! single deterministic step.
+//! This is a deliberately simplified ruleset
+//! compared to the original design in `old/README.md` —
+//! see `DESIGN.md` at the repo root for the rationale.
+//! The key simplifications:
+//! orders only move armies to *adjacent* tiles,
+//! each player spends a fixed pool of command points per turn
+//! (one per army moved or raised, no accumulation),
+//! and combat resolves in a single deterministic step.
 
 use std::collections::HashMap;
 
@@ -19,8 +22,14 @@ pub struct Config {
     pub radius: i32,
     /// 2 to 6 players (one map corner each).
     pub players: u8,
-    /// Orders each player may issue per turn (the CP budget, discretized).
-    pub orders_per_turn: usize,
+    /// Command points each player may spend per turn,
+    /// with no accumulation between turns.
+    /// A `Move` spends one CP per army moved;
+    /// a `Recruit` spends one CP per army raised.
+    /// Orders are funded in submission order until the pool runs out;
+    /// the order that can only be paid in part
+    /// runs partially and empties the pool (see `GameState::step`).
+    pub command_points: u32,
     /// Hard turn limit; at the limit the player owning the most tiles wins.
     pub max_turns: u32,
     /// Army on each player's starting tile.
@@ -41,7 +50,7 @@ impl Default for Config {
         Config {
             radius: 5,
             players: 2,
-            orders_per_turn: 3,
+            command_points: 20,
             max_turns: 500,
             initial_army: 20,
             initial_resources: 10,
@@ -63,6 +72,19 @@ pub struct Tile {
 pub enum MoveAmount {
     All,
     Half,
+}
+
+impl MoveAmount {
+    /// How many armies this order ships out of a stack of `army`
+    /// (before the command-point pool clamps it).
+    /// The single definition `order_cost` and `step` both use,
+    /// so the `Half` rounding can't drift between them.
+    fn of(self, army: u32) -> u32 {
+        match self {
+            MoveAmount::All => army,
+            MoveAmount::Half => army / 2,
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -235,6 +257,29 @@ impl GameState {
         }
     }
 
+    /// Command points `order` would spend against the current board —
+    /// the same amount `step` charges before clamping to the remaining pool:
+    /// a `Move` spends the armies it moves (all, or half rounded down),
+    /// a `Recruit` spends the resources it converts.
+    /// Orders `step` drops as no-ops
+    /// (off-map source or destination, empty source) cost 0.
+    /// Ownership is not checked here; callers pass their own tiles' orders.
+    pub fn order_cost(&self, order: &Order) -> u32 {
+        let Some(&src) = self.index.get(&order.source()) else {
+            return 0;
+        };
+        let tile = &self.tiles[src];
+        match *order {
+            Order::Recruit { .. } => tile.resources,
+            Order::Move { from, dir, amount } => {
+                if !self.index.contains_key(&from.neighbor(dir)) {
+                    return 0;
+                }
+                amount.of(tile.army)
+            }
+        }
+    }
+
     /// Every individually-legal order for the player in the current state.
     pub fn legal_orders(&self, player: PlayerId) -> Vec<Order> {
         let mut orders = Vec::new();
@@ -269,10 +314,19 @@ impl GameState {
         orders
     }
 
-    /// Resolve one simultaneous turn. `orders[p]` are player p's orders,
-    /// taken in list order until the per-turn budget is spent; illegal
-    /// orders (including a second order from the same source tile) are
-    /// dropped silently without consuming budget.
+    /// Resolve one simultaneous turn.
+    /// `orders[p]` are player p's orders,
+    /// funded in list order from that player's command-point pool
+    /// (`Config::command_points`, no accumulation between turns).
+    /// Each order costs one CP per army it moves or raises (`order_cost`);
+    /// the pool is charged for each,
+    /// and once an order can only be paid in part
+    /// it moves or raises as many armies as the remaining pool covers
+    /// and empties it, dropping the rest.
+    /// Illegal orders
+    /// (off-map, not owned by the player,
+    /// a second order from the same source tile)
+    /// are dropped silently without charge.
     ///
     /// Each player's orders apply to their own tiles only, so the player
     /// processing order is irrelevant: departures and recruits happen
@@ -288,7 +342,7 @@ impl GameState {
 
         for (p, player_orders) in orders.iter().enumerate() {
             let player = PlayerId(p as u8);
-            let mut budget = self.config.orders_per_turn;
+            let mut budget = self.config.command_points;
             for order in player_orders {
                 if budget == 0 {
                     break;
@@ -302,31 +356,33 @@ impl GameState {
                 match *order {
                     Order::Recruit { .. } => {
                         let tile = &mut self.tiles[src];
-                        if tile.resources == 0 {
+                        // One CP per army raised;
+                        // a pool that can't cover the whole tile
+                        // converts as many resources as it can.
+                        let converting = tile.resources.min(budget);
+                        if converting == 0 {
                             continue;
                         }
-                        tile.army += tile.resources;
-                        tile.resources = 0;
+                        tile.army += converting;
+                        tile.resources -= converting;
+                        budget -= converting;
                     }
                     Order::Move { from, dir, amount } => {
                         let Some(&dst) = self.index.get(&from.neighbor(dir)) else {
                             continue;
                         };
-                        let army = self.tiles[src].army;
-                        let moving = match amount {
-                            MoveAmount::All => army,
-                            MoveAmount::Half => army / 2,
-                        };
+                        // One CP per army moved; the pool caps how many go.
+                        let moving = amount.of(self.tiles[src].army).min(budget);
                         if moving == 0 {
                             continue;
                         }
                         self.tiles[src].army -= moving;
                         *arrivals.entry(dst).or_default().entry(player).or_default() +=
                             moving as u64;
+                        budget -= moving;
                     }
                 }
                 acted[src] = true;
-                budget -= 1;
             }
         }
 
@@ -407,6 +463,9 @@ mod tests {
     fn small_config() -> Config {
         Config {
             radius: 3,
+            // Ample CP so mechanic tests are never truncated by the pool;
+            // the `command_points_*` tests exercise the pool itself.
+            command_points: u32::MAX,
             ..Config::default()
         }
     }
@@ -549,14 +608,20 @@ mod tests {
     }
 
     #[test]
-    fn budget_respects_submitted_order() {
+    fn command_points_pool_is_shared_across_tiles() {
+        // A pool of exactly the starting army:
+        // moving that whole stack one tile spends it all,
+        // leaving nothing for a later order elsewhere.
+        let initial = Config::default().initial_army;
         let mut s = GameState::new(Config {
-            orders_per_turn: 1,
+            command_points: initial,
             ..small_config()
         });
         let start = start_of(&s, PlayerId(0));
         let dir = some_in_map_direction(&s, start);
         // Give player 0 a second tile so two distinct sources exist.
+        // The move from `start` lands here,
+        // so its post-turn army also proves the recruit never fired.
         let second = start.neighbor(dir);
         s.set_tile(
             second,
@@ -567,8 +632,8 @@ mod tests {
             },
         );
 
-        // Budget 1, [Move from start, Recruit at second]: the move is first
-        // in the list, so it executes and the recruit is dropped.
+        // [Move all of start, Recruit at second]:
+        // the move drains the pool, so the recruit gets no CP and is dropped.
         s.step(&[
             vec![move_all(start, dir), Order::Recruit { at: second }],
             vec![],
@@ -577,12 +642,61 @@ mod tests {
         assert_eq!(
             s.tile(start).unwrap().army,
             0,
-            "listed-first move must execute"
+            "listed-first move must spend the pool"
         );
         assert_eq!(
             s.tile(second).unwrap().army,
-            s.config.initial_army,
-            "recruit must be dropped once the budget is spent"
+            initial,
+            "recruit must be dropped once the pool is empty (only the moved army is here)"
+        );
+    }
+
+    #[test]
+    fn move_is_capped_by_command_points() {
+        // Pool smaller than the stack:
+        // only pool-many armies move, the rest stay put.
+        let mut s = GameState::new(Config {
+            command_points: 5,
+            ..small_config()
+        });
+        let start = start_of(&s, PlayerId(0));
+        let dir = some_in_map_direction(&s, start);
+        let dest = start.neighbor(dir);
+        let initial = s.config.initial_army;
+
+        s.step(&[vec![move_all(start, dir)], vec![]]);
+
+        assert_eq!(
+            s.tile(start).unwrap().army,
+            initial - 5,
+            "stack keeps the unpaid armies"
+        );
+        assert_eq!(s.tile(dest).unwrap().army, 5, "only pool-many armies move");
+    }
+
+    #[test]
+    fn recruit_is_capped_by_command_points() {
+        // One CP per army raised: a pool of 4 converts only 4 resources.
+        let mut s = GameState::new(Config {
+            command_points: 4,
+            ..small_config()
+        });
+        let start = start_of(&s, PlayerId(0));
+        s.set_tile(
+            start,
+            Tile {
+                owner: Some(PlayerId(0)),
+                army: 0,
+                resources: 30,
+            },
+        );
+
+        s.step(&[vec![Order::Recruit { at: start }], vec![]]);
+
+        assert_eq!(
+            s.tile(start).unwrap().army,
+            4,
+            "only pool-many resources become armies"
         );
     }
 
