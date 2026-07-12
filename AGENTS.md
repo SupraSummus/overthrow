@@ -37,3 +37,12 @@ Don't paste code or values into docs — formulas, defaults, sample CLI
 invocations excepted (`README.md` usage lines are commands to copy,
 not a copy of source). Link to the item instead; a pasted copy is
 guaranteed to drift.
+
+## Tracking debt you notice in passing
+
+When you spot a rough edge while working on something else — a refactor,
+a dead branch, drifted duplication, a missing test — log it in `TODO.md`
+at the repo root instead of fixing it now (scope creep) or burying an
+inline `// TODO` (invisible outside that file). Glance at `TODO.md`
+before starting new work; its header has the convention. Game-design
+questions are not debt: they go to `DESIGN.md`, next to their rationale.
