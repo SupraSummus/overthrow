@@ -3,10 +3,13 @@
 A minimalist simultaneous-turn strategy game on a hex map, being rebuilt in
 Rust as a single-player game against a machine-learned AI.
 
-One unit type, no terrain, no randomness in the rules. Each turn every player
-issues a small budget of orders; all orders resolve at once. Tiles passively
-accumulate resources (quickly when poor, slowly when rich — growth works
-against snowballing), and resources can be converted into armies.
+One unit type, no terrain, no randomness in the rules.
+Each turn every player spends a small pool of command points —
+one per army moved or raised, no accumulation between turns —
+and all orders resolve at once.
+Tiles passively accumulate resources
+(quickly when poor, slowly when rich — growth works against snowballing),
+and resources can be converted into armies.
 
 The rules are documented where they are implemented, in
 [`engine/`](engine/); their rationale and design history live in

@@ -26,17 +26,23 @@ the two cross-cutting intents no single item can show:
   near the cap and grow slowly, while a recovering player's poor tiles
   grow quickly — losing ground speeds your economy up instead of
   ending the game.
-- The flat order budget (`Config::orders_per_turn`) is the original
-  design's command-point idea discretized: order quality over click
-  speed, without the earn/accumulate/spend bookkeeping (see the table
-  below).
+- The command-point pool (`Config::command_points`)
+  is the original design's anti-APM currency,
+  kept per-army but stripped of accumulation:
+  each turn a player gets a fresh pool
+  and spends one CP per army moved or raised,
+  so force projection — not click speed — is the limiting resource.
+  Dropping the earn/accumulate/spend bookkeeping is the one simplification
+  (see the table below);
+  the per-army cost is what makes big offensives expensive and staged
+  rather than free.
 
 ## Differences from the original (old/README.md) and why
 
 | Original | v1 | Why |
 |---|---|---|
 | Move order targets any tile, engine paths one hex/turn | Move targets an adjacent tile only | Long moves are UI sugar over the same mechanic; per-step orders shrink the ML action space to `tiles × 6 × 2 + recruit` per order slot (passing = submitting fewer orders; there is no explicit pass order) |
-| Command points: earned, spent per army per step, accumulated to a cap | Flat `orders_per_turn` budget, no accumulation | Same anti-APM intent, drastically simpler to learn and reason about. Accumulation existed to let idle players catch up — irrelevant for local/AI games, so it stays out (decision, 2026-07) |
+| Command points: earned, spent per army per step, accumulated to a cap | Per-army `command_points` pool spent per step, no accumulation | Kept the per-army cost — it makes force projection the scarce resource and offensives staged rather than free. Dropped only accumulation, which existed to let idle players catch up — irrelevant for local/AI games (decision, 2026-07) |
 | Multi-turn attrition combat with attack/defense efficiency constants | Single-step strongest-party-wins with defense bonus | Fewer states in flight, no movement records to track, easier credit assignment for RL. Attrition combat can return if fights feel too binary |
 | Real-time ticks, no end | Discrete turns, `max_turns` limit, tile-count victory | RL needs episodes; a single-player game needs an ending |
 | Corporations, boss trees, transfers | Omitted | Out of scope for single-player vs AI (deliberate decision, 2026-07) |
@@ -67,8 +73,11 @@ Two layers, split by what they can claim:
   seeded bot series. Metric definitions live in `bot/src/stats.rs`
   (`MatchRecord`, `SeriesStats`); `bot/tests/health.rs` asserts one loose
   threshold per goal; the CLI prints the same metrics for ad-hoc runs.
-  The mapping: *strategy matters* → `greedy` dominates `random`, by
-  elimination rather than turn-limit adjudication; *fairness /
+  The mapping: *strategy matters* → `greedy` dominates `random`, with
+  conquest a common outcome rather than every game grinding to the turn
+  limit (the per-army command-point pool makes a decisive overrun
+  expensive, so a healthy share end by elimination and the rest on
+  territory at `max_turns`); *fairness /
   simultaneity* → seat-swap invariance and ~50/50 mirrors; *no
   snowball* → the comeback rate (`MatchRecord::comeback`: how often the
   quarter-mark tile leader loses anyway) is the thresholded proxy, backed

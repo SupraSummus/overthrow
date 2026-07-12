@@ -39,7 +39,7 @@ const BG: Color = Color::new(0.09, 0.10, 0.12, 1.0);
 struct App {
     state: GameState,
     bot: Box<dyn Bot>,
-    /// Human orders staged for the current turn (source-unique, budget-capped).
+    /// Human orders staged for the current turn (source-unique, CP-capped).
     pending: Vec<Order>,
     selected: Option<Hex>,
     seed: u64,
@@ -61,10 +61,15 @@ impl App {
         *self = App::new(next);
     }
 
-    /// True while the human may still add orders (game live, budget left).
+    /// Command points the staged orders will spend (see `GameState::step`).
+    fn pending_cp(&self) -> u32 {
+        self.pending.iter().map(|o| self.state.order_cost(o)).sum()
+    }
+
+    /// True while the human may still add orders (game live, CP left).
     fn accepting_orders(&self) -> bool {
         self.state.outcome() == Outcome::Ongoing
-            && self.pending.len() < self.state.config.orders_per_turn
+            && self.pending_cp() < self.state.config.command_points
     }
 
     /// Whether `hex` is already the source of a queued order
@@ -306,9 +311,9 @@ fn draw_hud(app: &App) -> f32 {
     draw_text(&line1, 14.0, 26.0, 22.0, WHITE);
 
     let line2 = format!(
-        "Orders {}/{}    Shift+click = half-move",
-        app.pending.len(),
-        s.config.orders_per_turn,
+        "CP {}/{}    Shift+click = half-move",
+        app.pending_cp(),
+        s.config.command_points,
     );
     draw_text(&line2, 14.0, 50.0, 18.0, Color::new(1.0, 1.0, 1.0, 0.8));
 

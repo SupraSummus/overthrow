@@ -44,15 +44,31 @@ pub fn run_match(config: Config, bots: &mut [Box<dyn Bot>]) -> (GameState, Match
     }
 }
 
-/// Keep the first order per source tile, up to the per-turn budget —
-/// mirrors exactly what the engine will accept.
+/// Keep the first order per source tile,
+/// funding them from the command-point pool in priority order
+/// until it runs out — mirrors what `step` will spend
+/// (the last order kept may only be partly paid,
+/// exactly as the engine runs it partially).
 fn take_budget(state: &GameState, candidates: impl IntoIterator<Item = Order>) -> Vec<Order> {
     let mut used_sources = HashSet::new();
-    candidates
-        .into_iter()
-        .filter(|order| used_sources.insert(order.source()))
-        .take(state.config.orders_per_turn)
-        .collect()
+    let mut remaining = state.config.command_points;
+    let mut chosen = Vec::new();
+    for order in candidates {
+        if remaining == 0 {
+            break;
+        }
+        if used_sources.contains(&order.source()) {
+            continue;
+        }
+        let cost = state.order_cost(&order);
+        if cost == 0 {
+            continue;
+        }
+        used_sources.insert(order.source());
+        chosen.push(order);
+        remaining = remaining.saturating_sub(cost);
+    }
+    chosen
 }
 
 /// Picks uniformly random legal orders (one per source tile).
