@@ -1,0 +1,13 @@
+[package]
+name = "overthrow-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "overthrow"
+path = "src/main.rs"
+
+[dependencies]
+overthrow-engine = { path = "../engine" }
+overthrow-bot = { path = "../bot" }
