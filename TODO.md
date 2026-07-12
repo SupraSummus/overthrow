@@ -16,4 +16,17 @@ The bot-name list lives in three places: `make_bot` in `bot/src/lib.rs` is the a
 
 The engine supports 2–6 players (`Config::players`) and the surrounding code is already player-count-generic (`SeriesStats::wins` is per-id, `print_map` letters owners from `A`), but the CLI hardcodes two: `--bots` insists on exactly two comma-separated names, `config.players` stays at the default, and the summary line prints only P0 and P1. Next move: parse `--bots` as N names, set `config.players` from the count, and loop the summary over players. Behavior change (new CLI surface), but additive.
 
+`app/` is keyboard-and-mouse only:
+ending a turn (Enter), recruiting (R) and starting a new game (N)
+have no pointer affordance,
+so on the Android target — where miniquad maps touches to mouse clicks —
+those actions are unreachable.
+Tile selection and moves work by touch, but a turn can't be ended.
+Next move: add on-screen buttons
+(an "End turn" and "New game" tap target,
+and a recruit button shown while a tile is selected)
+drawn in the HUD and hit-tested like tiles,
+so every action has a pointer path;
+keep the key bindings as desktop shortcuts.
+
 `Rng::below` in `engine/src/rng.rs` documents "uniform value in `0..bound`" but computes `next_u64() % bound`, which is modulo-biased for bounds that don't divide 2^64 — negligible at the tiny bounds the bot shuffles use, but the doc overpromises. Next move: either soften the doc to say the bias is accepted, or debias (rejection sampling / Lemire); prefer the latter before anything RL-side starts drawing from this RNG, since it would silently skew exploration.

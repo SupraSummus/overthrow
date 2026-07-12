@@ -1,0 +1,26 @@
+[package]
+name = "overthrow-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# One frontend crate, three targets: native desktop (cargo run), web
+# (wasm32-unknown-unknown + a static HTML shell), and Android (cargo-apk).
+# The engine and bots link in directly — there is no FFI boundary.
+[[bin]]
+name = "overthrow-app"
+path = "src/main.rs"
+
+[dependencies]
+overthrow-engine = { path = "../engine" }
+overthrow-bot = { path = "../bot" }
+macroquad = "0.4"
+
+# Android packaging via cargo-apk (see README). Defaults are fine; we only
+# set a human-readable label and a portrait-friendly orientation.
+[package.metadata.android]
+package = "ai.overthrow.app"
+build_targets = ["aarch64-linux-android", "armv7-linux-androideabi"]
+
+[package.metadata.android.application]
+label = "Overthrow"
