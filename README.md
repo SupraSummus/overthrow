@@ -8,9 +8,10 @@ issues a small budget of orders; all orders resolve at once. Tiles passively
 accumulate resources (quickly when poor, slowly when rich — growth works
 against snowballing), and resources can be converted into armies.
 
-The full ruleset and its rationale live in [DESIGN.md](DESIGN.md). The
-original Django/Vue multiplayer prototype is preserved under [`old/`](old/)
-as a reference implementation.
+The rules are documented where they are implemented, in
+[`engine/`](engine/); their rationale and design history live in
+[DESIGN.md](DESIGN.md). The original Django/Vue multiplayer prototype is
+preserved under [`old/`](old/) as a reference implementation.
 
 ## Layout
 
