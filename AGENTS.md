@@ -4,6 +4,25 @@ Agent-facing project doc. `CLAUDE.md` in the repo root is a symlink to
 this file, so both names resolve to the same content — different tools
 look for different filenames. Edit either, you edit both.
 
+## Prose uses semantic line breaks
+
+Write natural-language text — this file, `README.md`, `DESIGN.md`,
+`TODO.md`, commit bodies, doc comments — using
+[Semantic Line Breaks](https://sembr.org/):
+break the source after each sentence,
+and after an independent clause where it helps,
+instead of wrapping at a fixed column.
+The breaks render as spaces in Markdown, so the output is unchanged;
+what they buy is diffs that land on the clause that changed
+rather than reflowing a whole paragraph.
+As a rule of thumb keep lines under 80 characters
+and never break inside a hyphenated word —
+the link has the full MUST/SHOULD/MAY rules.
+
+Leave prose that predates this convention alone unless you are already
+editing it;
+when you touch a paragraph, reflow just that paragraph.
+
 ## Docs must not repeat what the code already says
 
 A doc paragraph that restates code behavior — a rule's mechanics, a
