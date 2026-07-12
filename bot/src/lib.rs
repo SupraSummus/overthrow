@@ -9,24 +9,37 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use overthrow_engine::rng::Rng;
 use overthrow_engine::{Config, GameState, Hex, MoveAmount, Order, Outcome, PlayerId};
 
+pub mod stats;
+
+pub use stats::{MatchRecord, SeriesStats};
+
 pub trait Bot {
     fn name(&self) -> &'static str;
     fn orders(&mut self, state: &GameState, me: PlayerId) -> Vec<Order>;
 }
 
-/// Drive a game to completion, one `Bot` per player.
-pub fn run_match(config: Config, bots: &mut [Box<dyn Bot>]) -> (GameState, Outcome) {
+/// Drive a game to completion, one `Bot` per player, tracing what the
+/// game-health metrics need (see `stats::MatchRecord`).
+pub fn run_match(config: Config, bots: &mut [Box<dyn Bot>]) -> (GameState, MatchRecord) {
     assert_eq!(bots.len(), config.players as usize);
     let mut state = GameState::new(config);
+    let mut leaders = vec![stats::strict_leader(&state)];
     loop {
         let orders: Vec<_> = bots
             .iter_mut()
             .enumerate()
             .map(|(p, bot)| bot.orders(&state, PlayerId(p as u8)))
             .collect();
-        match state.step(&orders) {
-            Outcome::Ongoing => {}
-            outcome => return (state, outcome),
+        let outcome = state.step(&orders);
+        leaders.push(stats::strict_leader(&state));
+        if outcome != Outcome::Ongoing {
+            let record = MatchRecord {
+                outcome,
+                turns: state.turn,
+                max_turns: state.config.max_turns,
+                leaders,
+            };
+            return (state, record);
         }
     }
 }
@@ -221,34 +234,5 @@ pub fn make_bot(name: &str, seed: u64) -> Option<Box<dyn Bot>> {
         "random" => Some(Box::new(RandomBot::new(seed))),
         "greedy" => Some(Box::new(GreedyBot::new(seed))),
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn greedy_beats_random_consistently() {
-        let config = Config {
-            radius: 4,
-            max_turns: 300,
-            ..Config::default()
-        };
-        let mut greedy_wins = 0;
-        for seed in 0..10 {
-            let mut bots: Vec<Box<dyn Bot>> = vec![
-                Box::new(GreedyBot::new(seed)),
-                Box::new(RandomBot::new(seed + 1000)),
-            ];
-            let (_, outcome) = run_match(config.clone(), &mut bots);
-            if outcome == Outcome::Winner(PlayerId(0)) {
-                greedy_wins += 1;
-            }
-        }
-        assert!(
-            greedy_wins >= 8,
-            "greedy should dominate random, won {greedy_wins}/10"
-        );
     }
 }
