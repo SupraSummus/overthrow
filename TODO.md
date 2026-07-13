@@ -14,8 +14,6 @@ Belongs here: refactors, dead code, inconsistencies, missing tests, sketchy patt
 
 The bot-name list lives in three places: `make_bot` in `bot/src/lib.rs` is the actual registry, and `cli/src/main.rs` repeats it twice as prose — the module doc's "Bots: greedy, random." and the unknown-bot error's "(available: greedy, random)". The usage line is likewise written out twice (module doc and the `eprintln!`). Adding a bot updates one match arm and silently strands the strings. Next move: export a name list next to `make_bot` (e.g. `pub const BOT_NAMES: &[&str]`), build the CLI error message from it, and have the doc comments point at `make_bot` instead of enumerating.
 
-The engine supports 2–6 players (`Config::players`) and the surrounding code is already player-count-generic (`SeriesStats::wins` is per-id, `print_map` letters owners from `A`), but the CLI hardcodes two: `--bots` insists on exactly two comma-separated names, `config.players` stays at the default, and the summary line prints only P0 and P1. Next move: parse `--bots` as N names, set `config.players` from the count, and loop the summary over players. Behavior change (new CLI surface), but additive.
-
 `app/` is keyboard-and-mouse only:
 every non-map action is a key press —
 ending a turn (Enter), recruiting (R), starting a new game (N),

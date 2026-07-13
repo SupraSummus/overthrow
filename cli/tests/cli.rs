@@ -19,6 +19,40 @@ fn match_subcommand_runs_to_completion() {
 }
 
 #[test]
+fn six_bots_run_a_six_player_match() {
+    let output = overthrow()
+        .args([
+            "match",
+            "--games",
+            "2",
+            "--radius",
+            "6",
+            "--bots",
+            "greedy,greedy,greedy,random,random,random",
+        ])
+        .output()
+        .expect("failed to spawn binary");
+    assert!(output.status.success(), "exit: {:?}", output.status);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("6 players"), "unexpected output: {stdout}");
+    // One standings entry per seat, P0 through P5.
+    assert!(stdout.contains("[P5]"), "unexpected output: {stdout}");
+}
+
+#[test]
+fn too_many_bots_are_rejected() {
+    let output = overthrow()
+        .args([
+            "match",
+            "--bots",
+            "greedy,greedy,greedy,greedy,greedy,greedy,greedy",
+        ])
+        .output()
+        .expect("failed to spawn binary");
+    assert_eq!(output.status.code(), Some(2));
+}
+
+#[test]
 fn unknown_arguments_are_rejected() {
     let output = overthrow()
         .args(["match", "--nonsense"])
