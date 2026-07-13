@@ -59,3 +59,16 @@ Behavior change (greedy plays differently), so it needs sign-off and a
 fresh `bot/tests/health.rs` check.
 
 `Rng::below` in `engine/src/rng.rs` documents "uniform value in `0..bound`" but computes `next_u64() % bound`, which is modulo-biased for bounds that don't divide 2^64 — negligible at the tiny bounds the bot shuffles use, but the doc overpromises. Next move: either soften the doc to say the bias is accepted, or debias (rejection sampling / Lemire); prefer the latter before anything RL-side starts drawing from this RNG, since it would silently skew exploration.
+
+GitHub reports ~200 Dependabot alerts on the default branch
+(24 critical as of 2026-07),
+almost certainly against the archived prototype's dependency locks
+under `old/` (`poetry.lock`, `frontend/package-lock.json`)
+rather than the Rust workspace,
+and the noise would bury a real alert against `Cargo.lock`.
+Next move: confirm on the repo's security tab
+that the alerts' manifest paths all sit under `old/`,
+then delete those lockfiles —
+the prototype is a frozen reference to read, not to deploy,
+and its manifests (`pyproject.toml`, `package.json`) stay —
+so alerts remain live for the Rust side only.

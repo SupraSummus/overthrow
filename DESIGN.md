@@ -108,10 +108,72 @@ fixed `--seed` so what was seen can be seen again.
   turns): under a turtling stalemate whoever grabs the early tile lead
   holds it to the adjudicated finish. Lead volatility quantifies that
   turtling — a near-frozen lead over a full game, where the comeback rate
-  only sees the endpoints. Expected with a defense bonus and no economic
-  pressure to attack; worth revisiting once a real frontend or smarter
-  bots exist. Possible levers: victory by resource share, decay on huge
-  stacks, or attack efficiency scaling.
+  only sees the endpoints.
+  Why the freeze is structural rather than a bot limitation —
+  and the levers against it —
+  is the subject of "Why turtling dominates" below.
+
+## Why turtling dominates (v1 rules)
+
+Analysis (2026-07): the greedy-mirror freeze is structural,
+not a bot limitation —
+under the v1 rules turtling is dominant in the two-player game,
+so a stronger opponent (including a learned one)
+would turtle harder, not break the stalemate.
+Three legs:
+
+- Offense is capped, defense is not.
+  The command-point pool is charged per army moved,
+  out of one shared per-turn pool,
+  so a player projects at most `Config::command_points` armies per turn
+  no matter how long they stage,
+  while a garrison persists indefinitely
+  and defends at full size times `Config::defense_bonus_pct`.
+  A garrison of the pool divided by the bonus (16 at defaults)
+  already forces at best mutual annihilation.
+- Every attack into defense trades at the bonus exchange rate,
+  and both sides convert the same per-turn pool into board effect
+  (raising or moving),
+  so an attacker can never out-produce the losses.
+- Passivity is free and wins:
+  resources grow whether or not a player acts,
+  stacks never decay,
+  and the `max_turns` tile-count adjudication rewards holding
+  whatever the early land grab yielded.
+
+This is analysis, not measurement,
+and it has a cheap falsification test:
+a scripted turtle-breaker bot
+(stage stacks, converge on the thinnest border tile);
+if it can beat `greedy`, the argument is wrong.
+
+Each candidate anti-turtling lever attacks one leg:
+stack decay or upkeep bounds defense;
+letting staged force exceed the per-turn cap,
+or attack-efficiency scaling, unbounds offense;
+victory by resource share or frontier-based scoring prices passivity.
+The planned experiment is a seeded variant tournament:
+implement the levers as `Config` knobs,
+run the gameplay-health metrics per variant,
+and keep the one lever that restores elimination and comebacks —
+one, because every surviving constant must earn its place.
+
+More players weakens the first leg:
+the offense cap is per player,
+so several neighbours can jointly out-deliver
+one defender's per-turn regeneration.
+But free-for-all incentives push the other way —
+in multi-party combat the winner pays
+everyone else's effective strength,
+so simultaneous attackers also fight each other
+and the abstaining vulture profits,
+and tile-count victory invites ganging up on the leader
+and kingmaking.
+That is political emergence,
+not the two-player duel depth the ML plan targets,
+so player count is deliberately not the anti-turtling fix;
+it stays a cheap experiment
+(the N-player CLI generalization is logged in `TODO.md`).
 
 ## ML plan (next phases)
 
@@ -132,4 +194,5 @@ radius 5 (~70k turns/sec), before any optimization. Comfortable for RL.
   for the RL formulation, but complicates the UI and the observation space.
 - Should `half` splits be richer (explicit amounts?) — richer play vs
   bigger action space.
-- Anti-turtling lever (see stalemate note above).
+- Anti-turtling lever — which one lever from "Why turtling dominates"
+  survives the variant tournament.
