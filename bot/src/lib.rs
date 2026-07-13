@@ -1,8 +1,12 @@
 //! Bots: strategies that map a game state to a set of orders.
 //!
-//! `RandomBot` is the sanity baseline; `GreedyBot` is a scripted heuristic
-//! opponent. A learned (neural-network) bot will implement the same `Bot`
-//! trait later, so everything that can run these two can run it.
+//! `RandomBot` is the sanity baseline,
+//! `GreedyBot` a scripted heuristic,
+//! and `TacticianBot` a stronger heuristic that beats it.
+//! A learned (neural-network) bot will implement the same `Bot` trait later,
+//! so everything that can run these can run it.
+//! `make_bot` is the name registry,
+//! and `BOT_NAMES` lists every name it accepts.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
@@ -10,8 +14,10 @@ use overthrow_engine::rng::Rng;
 use overthrow_engine::{Config, GameState, Hex, MoveAmount, Order, Outcome, PlayerId};
 
 pub mod stats;
+pub mod tactician;
 
 pub use stats::{MatchRecord, SeriesStats};
+pub use tactician::TacticianBot;
 
 pub trait Bot {
     fn name(&self) -> &'static str;
@@ -50,10 +56,27 @@ pub fn run_match(config: Config, bots: &mut [Box<dyn Bot>]) -> (GameState, Match
 /// (the last order kept may only be partly paid,
 /// exactly as the engine runs it partially).
 fn take_budget(state: &GameState, candidates: impl IntoIterator<Item = Order>) -> Vec<Order> {
+    take_budget_floored(state, candidates.into_iter().map(|order| (order, 1)))
+}
+
+/// `take_budget` with a per-order floor.
+/// `min_useful` is the fewest armies an order must actually be funded for
+/// to be worth keeping:
+/// the pool clamps a move or recruit to `min(cost, remaining)`,
+/// and an order that would land below its floor is skipped
+/// rather than committed under-strength —
+/// the leverage a bot needs to refuse an attack that loses beneath `needed`
+/// instead of bleeding army into it.
+/// A floor of `1` (anything the pool pays for is progress)
+/// recovers plain `take_budget`.
+pub(crate) fn take_budget_floored(
+    state: &GameState,
+    candidates: impl IntoIterator<Item = (Order, u32)>,
+) -> Vec<Order> {
     let mut used_sources = HashSet::new();
     let mut remaining = state.config.command_points;
     let mut chosen = Vec::new();
-    for order in candidates {
+    for (order, min_useful) in candidates {
         if remaining == 0 {
             break;
         }
@@ -64,11 +87,40 @@ fn take_budget(state: &GameState, candidates: impl IntoIterator<Item = Order>) -
         if cost == 0 {
             continue;
         }
+        let funded = cost.min(remaining);
+        if funded < min_useful {
+            continue;
+        }
         used_sources.insert(order.source());
         chosen.push(order);
-        remaining = remaining.saturating_sub(cost);
+        remaining -= funded;
     }
     chosen
+}
+
+/// BFS distance from every tile to the nearest tile not owned by `me`.
+/// One O(tiles) pass per turn;
+/// interior armies descend this gradient toward the fighting.
+/// Shared by the scripted bots that route reserves forward.
+pub(crate) fn frontier_distances(state: &GameState, me: PlayerId) -> HashMap<Hex, u32> {
+    let mut dist = HashMap::new();
+    let mut queue = VecDeque::new();
+    for (hex, tile) in state.iter_tiles() {
+        if tile.owner != Some(me) {
+            dist.insert(hex, 0);
+            queue.push_back(hex);
+        }
+    }
+    while let Some(hex) = queue.pop_front() {
+        let d = dist[&hex];
+        for (_, neighbor) in hex.neighbors() {
+            if state.tile(neighbor).is_some() && !dist.contains_key(&neighbor) {
+                dist.insert(neighbor, d + 1);
+                queue.push_back(neighbor);
+            }
+        }
+    }
+    dist
 }
 
 /// Picks uniformly random legal orders (one per source tile).
@@ -109,29 +161,6 @@ impl GreedyBot {
             rng: Rng::new(seed),
         }
     }
-
-    /// BFS distance from every tile to the nearest tile not owned by `me`.
-    /// One O(tiles) pass per turn; interior armies descend this gradient.
-    fn frontier_distances(state: &GameState, me: PlayerId) -> HashMap<Hex, u32> {
-        let mut dist = HashMap::new();
-        let mut queue = VecDeque::new();
-        for (hex, tile) in state.iter_tiles() {
-            if tile.owner != Some(me) {
-                dist.insert(hex, 0);
-                queue.push_back(hex);
-            }
-        }
-        while let Some(hex) = queue.pop_front() {
-            let d = dist[&hex];
-            for (_, neighbor) in hex.neighbors() {
-                if state.tile(neighbor).is_some() && !dist.contains_key(&neighbor) {
-                    dist.insert(neighbor, d + 1);
-                    queue.push_back(neighbor);
-                }
-            }
-        }
-        dist
-    }
 }
 
 impl Bot for GreedyBot {
@@ -140,7 +169,7 @@ impl Bot for GreedyBot {
     }
 
     fn orders(&mut self, state: &GameState, me: PlayerId) -> Vec<Order> {
-        let frontier = Self::frontier_distances(state, me);
+        let frontier = frontier_distances(state, me);
         // (priority, order); higher priority first.
         let mut scored: Vec<(i64, Order)> = Vec::new();
 
@@ -245,10 +274,15 @@ impl Bot for GreedyBot {
     }
 }
 
+/// Every name `make_bot` accepts, for CLI usage and error strings so the
+/// list is written once. Keep in sync with `make_bot`'s match arms.
+pub const BOT_NAMES: &[&str] = &["random", "greedy", "tactician"];
+
 pub fn make_bot(name: &str, seed: u64) -> Option<Box<dyn Bot>> {
     match name {
         "random" => Some(Box::new(RandomBot::new(seed))),
         "greedy" => Some(Box::new(GreedyBot::new(seed))),
+        "tactician" => Some(Box::new(TacticianBot::new(seed))),
         _ => None,
     }
 }

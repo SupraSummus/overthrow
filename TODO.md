@@ -12,7 +12,7 @@ Belongs here: refactors, dead code, inconsistencies, missing tests, sketchy patt
 
 `cli/src/main.rs` handles bad flag values inconsistently: a non-numeric `--games`, `--radius`, or `--seed` panics through `expect` (a raw Rust panic message with a backtrace hint), while every other user error in the same parser — missing value, unknown flag, malformed `--bots` — prints a one-line message and exits with code 2. Next move: replace the three `expect` calls with the `eprintln!` + `exit(2)` shape their neighbors already use, and pin the exit code with a case in `cli/tests/cli.rs` alongside `unknown_arguments_are_rejected`.
 
-The bot-name list lives in three places: `make_bot` in `bot/src/lib.rs` is the actual registry, and `cli/src/main.rs` repeats it twice as prose — the module doc's "Bots: greedy, random." and the unknown-bot error's "(available: greedy, random)". The usage line is likewise written out twice (module doc and the `eprintln!`). Adding a bot updates one match arm and silently strands the strings. Next move: export a name list next to `make_bot` (e.g. `pub const BOT_NAMES: &[&str]`), build the CLI error message from it, and have the doc comments point at `make_bot` instead of enumerating.
+The CLI usage line is written out twice in `cli/src/main.rs` — the module doc and the `eprintln!` on a bad subcommand — so a flag added to one can drift from the other. Next move: hoist the string to a `const USAGE: &str` and print that in both places (or have the module doc point at it rather than restate it).
 
 `app/` is keyboard-and-mouse only:
 every non-map action is a key press —
@@ -49,12 +49,14 @@ so an attack scored as winning can land under-strength and lose —
 greedy throws armies and CP at overruns it can't actually fund this turn.
 The scoring pass is blind to the pool because `take_budget` allocates CP
 only afterwards.
-Next move: fold the pool into scoring —
-walk candidates in priority order tracking remaining CP,
-and only commit an attack whose funded strength (`min(army, remaining)`)
-still clears `needed`, deferring or downgrading the rest.
-Behavior change (greedy plays differently), so it needs sign-off and a
-fresh `bot/tests/health.rs` check.
+Next move: give greedy's attacks a funding floor —
+`take_budget_floored` (added for `TacticianBot`)
+already drops an order whose `min(army, remaining)` share
+falls below a per-order `min_useful`,
+so greedy need only tag each attack candidate with `needed`
+and route through it, exactly as `TacticianBot` does.
+Behavior change (greedy plays differently),
+so it needs sign-off and a fresh `bot/tests/health.rs` check.
 
 `Rng::below` in `engine/src/rng.rs` documents "uniform value in `0..bound`" but computes `next_u64() % bound`, which is modulo-biased for bounds that don't divide 2^64 — negligible at the tiny bounds the bot shuffles use, but the doc overpromises. Next move: either soften the doc to say the bias is accepted, or debias (rejection sampling / Lemire); prefer the latter before anything RL-side starts drawing from this RNG, since it would silently skew exploration.
 

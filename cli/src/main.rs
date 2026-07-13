@@ -4,12 +4,13 @@
 //!   overthrow match [--games N] [--radius R] [--bots A,B,...] [--seed S] [--render]
 //!
 //! `--bots` takes 2 to 6 comma-separated names, one per player; the player
-//! count follows from the list. Bots: greedy, random.
+//! count follows from the list. The accepted names are `overthrow_bot`'s
+//! `make_bot` registry, listed in `BOT_NAMES`.
 
 use std::env;
 use std::process::exit;
 
-use overthrow_bot::{make_bot, run_match, Bot, SeriesStats};
+use overthrow_bot::{make_bot, run_match, Bot, SeriesStats, BOT_NAMES};
 use overthrow_engine::{Config, GameState, Hex, PlayerId};
 
 fn main() {
@@ -75,7 +76,7 @@ fn main() {
             .map(|(i, name)| {
                 make_bot(name, game_seed.wrapping_mul(2).wrapping_add(i as u64)).unwrap_or_else(
                     || {
-                        eprintln!("unknown bot: {name} (available: greedy, random)");
+                        eprintln!("unknown bot: {name} (available: {})", BOT_NAMES.join(", "));
                         exit(2);
                     },
                 )
