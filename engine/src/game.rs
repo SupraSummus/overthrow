@@ -36,13 +36,30 @@ pub struct Config {
     pub initial_army: u32,
     /// Resources every tile starts with.
     pub initial_resources: u32,
-    /// Resources stop growing at this value.
-    pub resource_cap: u32,
-    /// Per-turn growth is `max(1, (resource_cap - resources) / growth_divisor)`:
-    /// fast when low, slow near the cap — the anti-snowball curve.
-    pub growth_divisor: u32,
+    /// Flat resources every tile produces each turn — the production half of
+    /// the production/maintenance flow (see `maintenance_pct`).
+    pub production: u32,
+    /// Per-turn maintenance each tile pays,
+    /// as a percent of the resources present (`2` = 2% of the stockpile).
+    /// Production minus this maintenance is a self-limiting flow:
+    /// a poor tile grows fast and a near-full one barely grows
+    /// — the anti-snowball curve —
+    /// settling at the emergent cap `Config::resource_equilibrium`.
+    /// A percentage, so it must be in `1..=100`.
+    pub maintenance_pct: u32,
     /// Defender strength multiplier in percent (125 = 1.25x).
     pub defense_bonus_pct: u32,
+}
+
+impl Config {
+    /// The resource level a tile converges to under the production/maintenance
+    /// flow: `ceil(production * 100 / maintenance_pct)`. There maintenance
+    /// cancels production and growth stops — the emergent cap, in place of a
+    /// hard constant. Growing from below (as every tile does from
+    /// `initial_resources`), a tile lands on exactly this value.
+    pub fn resource_equilibrium(&self) -> u32 {
+        (self.production * 100).div_ceil(self.maintenance_pct)
+    }
 }
 
 impl Default for Config {
@@ -54,8 +71,8 @@ impl Default for Config {
             max_turns: 500,
             initial_army: 20,
             initial_resources: 10,
-            resource_cap: 100,
-            growth_divisor: 25,
+            production: 2,
+            maintenance_pct: 2,
             defense_bonus_pct: 125,
         }
     }
@@ -133,7 +150,10 @@ impl GameState {
             "2 to 6 players supported (one corner each)"
         );
         assert!(config.radius >= 1, "map too small");
-        assert!(config.growth_divisor >= 1, "growth_divisor must be nonzero");
+        assert!(
+            (1..=100).contains(&config.maintenance_pct),
+            "maintenance_pct is a percentage in 1..=100"
+        );
 
         let hexes: Vec<Hex> = hexagon(config.radius).collect();
         let index: HashMap<Hex, usize> = hexes.iter().enumerate().map(|(i, h)| (*h, i)).collect();
@@ -330,7 +350,8 @@ impl GameState {
     ///
     /// Each player's orders apply to their own tiles only, so the player
     /// processing order is irrelevant: departures and recruits happen
-    /// "at once", then everything lands and fights, then resources grow.
+    /// "at once", then everything lands and fights, then resources flow
+    /// (production minus maintenance).
     /// One order per tile per turn also means recruited armies defend
     /// immediately but cannot move until the next turn.
     pub fn step(&mut self, orders: &[Vec<Order>]) -> Outcome {
@@ -441,14 +462,13 @@ impl GameState {
             tile.army = surviving.min(u32::MAX as u128) as u32;
         }
 
-        // Resource growth on every tile: fast when poor, slow near the cap.
+        // Flat production minus stockpile-scaled maintenance; converges up to
+        // `Config::resource_equilibrium`. `maintenance_pct <= 100` keeps the
+        // maintenance from exceeding the stockpile, so the subtraction is safe.
         for tile in &mut self.tiles {
-            if tile.resources < self.config.resource_cap {
-                let growth = ((self.config.resource_cap - tile.resources)
-                    / self.config.growth_divisor)
-                    .max(1);
-                tile.resources = (tile.resources + growth).min(self.config.resource_cap);
-            }
+            let maintenance =
+                (tile.resources as u64 * self.config.maintenance_pct as u64 / 100) as u32;
+            tile.resources = (tile.resources - maintenance).saturating_add(self.config.production);
         }
 
         self.turn += 1;
@@ -752,15 +772,14 @@ mod tests {
     }
 
     #[test]
-    fn resources_grow_toward_cap() {
+    fn resources_converge_to_equilibrium() {
         let mut s = state();
-        for _ in 0..2000 {
+        // Far more turns than the ~100 a tile needs to climb from
+        // `initial_resources` to the equilibrium and stop there.
+        for _ in 0..s.config.max_turns {
             s.step(&[vec![], vec![]]);
-            if s.turn >= s.config.max_turns {
-                break;
-            }
         }
-        let cap = s.config.resource_cap;
-        assert!(s.iter_tiles().all(|(_, t)| t.resources == cap));
+        let eq = s.config.resource_equilibrium();
+        assert!(s.iter_tiles().all(|(_, t)| t.resources == eq));
     }
 }

@@ -90,9 +90,12 @@ fn check_invariants(state: &GameState, ever_owned: &mut HashSet<Hex>) {
                 ever_owned.insert(hex);
             }
         }
+        // Resources grow up to the production/maintenance equilibrium and
+        // stop; nothing raises them past it (recruit only lowers them), so
+        // it is a hard ceiling.
         assert!(
-            tile.resources <= state.config.resource_cap,
-            "tile {hex:?} exceeds the resource cap"
+            tile.resources <= state.config.resource_equilibrium(),
+            "tile {hex:?} exceeds its resource equilibrium"
         );
     }
     assert!(
@@ -177,4 +180,4 @@ fn golden_game_final_state_is_pinned() {
 }
 
 const GOLDEN_TURNS: u32 = 200;
-const GOLDEN_HASH: u64 = 10135845784850105762;
+const GOLDEN_HASH: u64 = 1061877323026431320;

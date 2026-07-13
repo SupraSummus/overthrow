@@ -21,11 +21,18 @@ elimination and victory. Map geometry (hexagonal, cube coordinates) is
 `engine/src/coords.rs`. This doc doesn't repeat any of that; it records
 the two cross-cutting intents no single item can show:
 
-- The resource growth curve (`Config::growth_divisor`) is the
-  anti-snowball mechanic at the empire scale: a big empire's tiles sit
-  near the cap and grow slowly, while a recovering player's poor tiles
-  grow quickly — losing ground speeds your economy up instead of
-  ending the game.
+- The resource flow (`Config::production` minus a stockpile-scaled
+  `Config::maintenance_pct`) is the anti-snowball mechanic at the empire
+  scale: a big empire's tiles sit near the equilibrium and grow slowly,
+  while a recovering player's poor tiles grow quickly — losing ground
+  speeds your economy up instead of ending the game. The equilibrium
+  (`Config::resource_equilibrium`) is emergent from two meaningful knobs
+  rather than a hard-cap constant, but this is the same *kind* of curve as
+  the original grow-toward-a-cap rule — tuned leaner — not a new pressure:
+  resources never rise above the equilibrium, so there is no upkeep on a
+  hoard and no bite on passivity. The lever against turtling is army-side
+  (stack decay or garrison upkeep), noted in "Why turtling dominates"
+  below.
 - The command-point pool (`Config::command_points`)
   is the original design's anti-APM currency,
   kept per-army but stripped of accumulation:
@@ -95,20 +102,20 @@ fixed `--seed` so what was seen can be seen again.
 
 ## Observed behavior (bot-vs-bot, radius 5, defaults)
 
-- `greedy` beats `random` 200/200, avg ~89 turns, every win by
-  elimination.
+- `greedy` beats `random` 200/200, avg ~420 turns, about three-quarters by
+  elimination and the rest decided on territory at `max_turns`.
 - Mirror matches are ~50/50 with no first-player advantage — the setup is
   symmetric and turns are truly simultaneous.
 - *Both* mirrors always hit `max_turns` and get decided by tile-count
   adjudication, never elimination. For `random` mirrors the quarter-mark
-  lead barely predicts the winner (comeback rate ~42%) and the lead
-  changes hands constantly (~17 times per game) — noisy play keeps the
-  race open. For `greedy` mirrors it predicted all 186 decided games (0
-  comebacks) and the lead barely moves (~0.7 changes per game over 500
-  turns): under a turtling stalemate whoever grabs the early tile lead
-  holds it to the adjudicated finish. Lead volatility quantifies that
-  turtling — a near-frozen lead over a full game, where the comeback rate
-  only sees the endpoints.
+  lead barely predicts the winner (comeback rate ~35%) and the lead
+  changes hands constantly (~8 times per game) — noisy play keeps the
+  race open. For `greedy` mirrors it nearly always predicts the winner (a
+  handful of comebacks over ~190 decided games) and the lead barely moves
+  (~1.6 changes per game over 500 turns): under a turtling stalemate
+  whoever grabs the early tile lead holds it to the adjudicated finish.
+  Lead volatility quantifies that turtling — a near-frozen lead over a
+  full game, where the comeback rate only sees the endpoints.
   Why the freeze is structural rather than a bot limitation —
   and the levers against it —
   is the subject of "Why turtling dominates" below.

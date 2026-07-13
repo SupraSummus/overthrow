@@ -47,7 +47,7 @@ rules; split everything else by ownership:
   reference example.
 
 Cross-references go by name: docs name files, types, and functions
-(`engine/src/game.rs`, `Config::growth_divisor`); a code comment whose
+(`engine/src/game.rs`, `Config::maintenance_pct`); a code comment whose
 "why" spans modules points at a `DESIGN.md` section by heading, as the
 `game.rs` module doc does. When renaming a doc heading or a named
 item, grep the other side for references to it.
