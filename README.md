@@ -21,8 +21,9 @@ preserved under [`old/`](old/) as a reference implementation.
 - `engine/` — pure game rules. Deterministic, no I/O, no dependencies.
   The single source of truth, intended to be reused unchanged by the
   desktop/Android app, headless simulation, and RL training.
-- `bot/` — opponents implementing the `Bot` trait: `random` (baseline) and
-  `greedy` (scripted heuristic). A learned policy bot will slot in here.
+- `bot/` — opponents implementing the `Bot` trait: `random` (baseline),
+  `greedy` (scripted heuristic) and `tactician` (a stronger heuristic that
+  beats `greedy`). A learned policy bot will slot in here.
 - `cli/` — headless runner for bot-vs-bot matches.
 - `app/` — playable [macroquad](https://macroquad.rs) frontend
   (human vs bot, or spectating a bot-vs-bot match).
@@ -34,7 +35,7 @@ preserved under [`old/`](old/) as a reference implementation.
     cargo test
     cargo run --release -p overthrow-cli -- match --games 200
     cargo run --release -p overthrow-cli -- match --games 1 --render
-    cargo run --release -p overthrow-cli -- match --bots greedy,greedy --radius 6
+    cargo run --release -p overthrow-cli -- match --bots tactician,greedy --radius 6
     cargo run --release -p overthrow-cli -- match --bots greedy,greedy,greedy,greedy,greedy,greedy --radius 6
 
 ## Roadmap

@@ -53,6 +53,24 @@ fn greedy_dominates_random_by_elimination() {
     );
 }
 
+/// The scripted ladder must have a top rung:
+/// `tactician` beats `greedy` decisively from either seat.
+/// It wins the neutral land grab and holds it to the tile-count adjudication
+/// rather than trading into the defense bonus,
+/// so — like every `greedy` mirror — these games run to the turn limit;
+/// the win shows up in the standings, not in eliminations.
+/// Guards against a change that lets `greedy`
+/// (or the shared funding/expansion code) regress the stronger bot.
+#[test]
+fn tactician_dominates_greedy_from_either_seat() {
+    let as_p0 = run_series(("tactician", "greedy"), 20).wins_of(PlayerId(0));
+    let as_p1 = run_series(("greedy", "tactician"), 20).wins_of(PlayerId(1));
+    assert!(
+        as_p0 >= 18 && as_p1 >= 18,
+        "tactician should dominate greedy from either seat, won {as_p0}/20 as P0, {as_p1}/20 as P1"
+    );
+}
+
 /// Fairness: strength must not depend on seat order. The setup is
 /// symmetric and turns resolve simultaneously, so greedy must dominate
 /// random equally as P0 and as P1.

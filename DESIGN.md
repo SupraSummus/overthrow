@@ -104,6 +104,22 @@ fixed `--seed` so what was seen can be seen again.
 
 - `greedy` beats `random` 200/200, avg ~420 turns, about three-quarters by
   elimination and the rest decided on territory at `max_turns`.
+- `tactician` beats `greedy` from either seat — 200/200 at radius 5, and a
+  clean sweep at every radius tested from 4 up (4, 6, 7) — but never by
+  elimination: like the `greedy` mirror, every game runs to `max_turns` and
+  is decided on tile count. It wins the opening land grab (claiming toward
+  the contested centre with pool-efficient moves, holding the frontier with
+  garrisons the capped attacker cannot out-fund) and freezes ahead, rather
+  than trading armies into the defense bonus. So the `greedy`-mirror freeze
+  was partly a `greedy` limitation — a better land-grabber simply owns more
+  of the board when the lead locks in — not purely structural; `tactician`
+  still cannot break `greedy`'s turtle, only out-turtle it (see "Why
+  turtling dominates" below). Its own mirror keeps a mild first-seat lean
+  (~55/45 over 400 games, where `greedy`'s is even); the likeliest cause is
+  combat's tie-break — `GameState::step` awards an exact-strength clash to
+  the lower player id — which its centre-axis march runs into more often
+  than `greedy`'s looser expansion, but that is unverified analysis, not a
+  measured decomposition.
 - Mirror matches are ~50/50 with no first-player advantage — the setup is
   symmetric and turns are truly simultaneous.
 - *Both* mirrors always hit `max_turns` and get decided by tile-count
@@ -165,6 +181,11 @@ and it has a cheap falsification test:
 a scripted turtle-breaker bot
 (stage stacks, converge on the thinnest border tile);
 if it can beat `greedy`, the argument is wrong.
+`tactician` beating `greedy` is not that falsification:
+it wins the tile-count adjudication by out-grabbing the neutral land
+and never by breaking a garrison,
+so its sweep is over-turtling, not offense out-delivering defense —
+the leg the test targets still stands.
 
 Each candidate anti-turtling lever attacks one leg:
 stack decay or upkeep bounds defense;
