@@ -1,9 +1,10 @@
 //! Headless runner: pit bots against each other, print stats, render maps.
 //!
 //! Usage:
-//!   overthrow match [--games N] [--radius R] [--bots A,B] [--seed S] [--render]
+//!   overthrow match [--games N] [--radius R] [--bots A,B,...] [--seed S] [--render]
 //!
-//! Bots: greedy, random.
+//! `--bots` takes 2 to 6 comma-separated names, one per player; the player
+//! count follows from the list. Bots: greedy, random.
 
 use std::env;
 use std::process::exit;
@@ -15,14 +16,14 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.first().map(String::as_str) != Some("match") {
         eprintln!(
-            "usage: overthrow match [--games N] [--radius R] [--bots A,B] [--seed S] [--render]"
+            "usage: overthrow match [--games N] [--radius R] [--bots A,B,...] [--seed S] [--render]"
         );
         exit(2);
     }
 
     let mut games = 20u32;
     let mut radius = 5i32;
-    let mut bots = ("greedy".to_string(), "random".to_string());
+    let mut bots = vec!["greedy".to_string(), "random".to_string()];
     let mut seed = 1u64;
     let mut render = false;
 
@@ -42,11 +43,13 @@ fn main() {
             "--seed" => seed = value("--seed").parse().expect("--seed: not a number"),
             "--bots" => {
                 let v = value("--bots");
-                let (a, b) = v.split_once(',').unwrap_or_else(|| {
-                    eprintln!("--bots wants two comma-separated names, e.g. greedy,random");
+                bots = v.split(',').map(str::to_string).collect();
+                if !(2..=6).contains(&bots.len()) {
+                    eprintln!(
+                        "--bots wants 2 to 6 comma-separated names, one per player, e.g. greedy,random"
+                    );
                     exit(2);
-                });
-                bots = (a.to_string(), b.to_string());
+                }
             }
             "--render" => render = true,
             other => {
@@ -58,6 +61,7 @@ fn main() {
 
     let config = Config {
         radius,
+        players: bots.len() as u8,
         ..Config::default()
     };
 
@@ -65,7 +69,7 @@ fn main() {
 
     for game_index in 0..games {
         let game_seed = seed + game_index as u64;
-        let mut players: Vec<Box<dyn Bot>> = [&bots.0, &bots.1]
+        let mut players: Vec<Box<dyn Bot>> = bots
             .iter()
             .enumerate()
             .map(|(i, name)| {
@@ -83,21 +87,26 @@ fn main() {
 
         if render {
             println!(
-                "game {game_index}: {:?} after {} turns  ({} vs {})",
-                record.outcome, state.turn, bots.0, bots.1
+                "game {game_index}: {:?} after {} turns  ({})",
+                record.outcome,
+                state.turn,
+                bots.join(" vs "),
             );
             print_map(&state);
         }
     }
 
+    let standings: Vec<String> = bots
+        .iter()
+        .enumerate()
+        .map(|(p, name)| format!("{name} [P{p}] {} wins", stats.wins_of(PlayerId(p as u8))))
+        .collect();
     println!(
-        "{} games, radius {}: {} [P0] {} wins, {} [P1] {} wins, {} draws, avg {} turns",
+        "{} games, radius {}, {} players: {}, {} draws, avg {} turns",
         games,
         radius,
-        bots.0,
-        stats.wins_of(PlayerId(0)),
-        bots.1,
-        stats.wins_of(PlayerId(1)),
+        bots.len(),
+        standings.join(", "),
         stats.draws,
         stats.avg_turns(),
     );
@@ -112,7 +121,8 @@ fn main() {
     );
 }
 
-/// ASCII map: each tile is `<owner><army>`, owner A/B/. (neutral). Rows
+/// ASCII map: each tile is `<owner><army>`, owner A-F by player id or
+/// `.` (neutral). Rows
 /// follow the z axis; each row is half a cell narrower per step away from
 /// the center, giving the classic hexagon silhouette.
 fn print_map(state: &GameState) {

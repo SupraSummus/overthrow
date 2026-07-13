@@ -119,6 +119,18 @@ fixed `--seed` so what was seen can be seen again.
   Why the freeze is structural rather than a bot limitation —
   and the levers against it —
   is the subject of "Why turtling dominates" below.
+- Six-player free-for-alls (radius 6, one bot per corner) behave the same
+  way at the top level: every game still runs to `max_turns` and is
+  adjudicated, never won by elimination, for both mirrors — six `greedy`
+  turtles no more break the stalemate than two do. The seats stay fair
+  (wins spread evenly across the six corners, no positional advantage), and
+  the turtling signature carries over: the `greedy` six-way barely moves
+  its lead (~3 changes per game, comeback rate ~6%) while the `random`
+  six-way is pure churn (~30 changes per game, comeback rate ~77%). Mixing
+  three `greedy` against three `random` around the ring, the `greedy` seats
+  take every decided game and the `random` seats win none. This measures
+  the multi-player prediction in "Why turtling dominates" below: more
+  attackers do not, in practice, out-deliver a turtle's defense.
 
 ## Why turtling dominates (v1 rules)
 
@@ -165,9 +177,9 @@ run the gameplay-health metrics per variant,
 and keep the one lever that restores elimination and comebacks —
 one, because every surviving constant must earn its place.
 
-More players weakens the first leg:
+In principle more players weakens the first leg:
 the offense cap is per player,
-so several neighbours can jointly out-deliver
+so several neighbours could jointly out-deliver
 one defender's per-turn regeneration.
 But free-for-all incentives push the other way —
 in multi-party combat the winner pays
@@ -176,11 +188,15 @@ so simultaneous attackers also fight each other
 and the abstaining vulture profits,
 and tile-count victory invites ganging up on the leader
 and kingmaking.
+Six-`greedy` runs land on the second reading:
+they still never end by elimination (see "Observed behavior" above),
+so in practice the extra attackers do not break the turtle —
+they turtle their own corners.
 That is political emergence,
 not the two-player duel depth the ML plan targets,
-so player count is deliberately not the anti-turtling fix;
-it stays a cheap experiment
-(the N-player CLI generalization is logged in `TODO.md`).
+so player count is deliberately not the anti-turtling fix.
+It is a cheap experiment to run
+(`--bots` takes 2–6 names, one per corner).
 
 ## ML plan (next phases)
 

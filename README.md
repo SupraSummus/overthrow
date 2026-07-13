@@ -35,6 +35,7 @@ preserved under [`old/`](old/) as a reference implementation.
     cargo run --release -p overthrow-cli -- match --games 200
     cargo run --release -p overthrow-cli -- match --games 1 --render
     cargo run --release -p overthrow-cli -- match --bots greedy,greedy --radius 6
+    cargo run --release -p overthrow-cli -- match --bots greedy,greedy,greedy,greedy,greedy,greedy --radius 6
 
 ## Roadmap
 
