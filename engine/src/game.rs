@@ -138,9 +138,11 @@ pub enum Outcome {
 pub struct GameState {
     pub config: Config,
     pub turn: u32,
-    tiles: Vec<Tile>,
-    hexes: Vec<Hex>,
-    index: HashMap<Hex, usize>,
+    // Parallel to `hexes` and addressed by `index`; kept crate-visible so the
+    // `encoding` module can project the board without a second copy.
+    pub(crate) tiles: Vec<Tile>,
+    pub(crate) hexes: Vec<Hex>,
+    pub(crate) index: HashMap<Hex, usize>,
 }
 
 impl GameState {

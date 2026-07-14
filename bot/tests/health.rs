@@ -71,6 +71,23 @@ fn tactician_dominates_greedy_from_either_seat() {
     );
 }
 
+/// The learned bot must clear the bar the vertical slice was built to clear:
+/// `ml` beats `random` decisively from either seat. The policy is trained
+/// only at radius 3 (see `bot/src/ml`), so winning here at radius 4 also
+/// guards that the encoding stays translation-invariant across map sizes —
+/// a change to `engine::encoding` that broke that would regress this. Like
+/// the scripted bots it wins by holding territory to the tile-count
+/// adjudication, not by elimination, so the check is on the standings.
+#[test]
+fn ml_beats_random_from_either_seat() {
+    let as_p0 = run_series(("ml", "random"), 20).wins_of(PlayerId(0));
+    let as_p1 = run_series(("random", "ml"), 20).wins_of(PlayerId(1));
+    assert!(
+        as_p0 >= 18 && as_p1 >= 18,
+        "ml should dominate random from either seat, won {as_p0}/20 as P0, {as_p1}/20 as P1"
+    );
+}
+
 /// Fairness: strength must not depend on seat order. The setup is
 /// symmetric and turns resolve simultaneously, so greedy must dominate
 /// random equally as P0 and as P1.

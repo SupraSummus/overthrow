@@ -13,9 +13,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use overthrow_engine::rng::Rng;
 use overthrow_engine::{Config, GameState, Hex, MoveAmount, Order, Outcome, PlayerId};
 
+pub mod ml;
 pub mod stats;
 pub mod tactician;
 
+pub use ml::MlBot;
 pub use stats::{MatchRecord, SeriesStats};
 pub use tactician::TacticianBot;
 
@@ -276,13 +278,14 @@ impl Bot for GreedyBot {
 
 /// Every name `make_bot` accepts, for CLI usage and error strings so the
 /// list is written once. Keep in sync with `make_bot`'s match arms.
-pub const BOT_NAMES: &[&str] = &["random", "greedy", "tactician"];
+pub const BOT_NAMES: &[&str] = &["random", "greedy", "tactician", "ml"];
 
 pub fn make_bot(name: &str, seed: u64) -> Option<Box<dyn Bot>> {
     match name {
         "random" => Some(Box::new(RandomBot::new(seed))),
         "greedy" => Some(Box::new(GreedyBot::new(seed))),
         "tactician" => Some(Box::new(TacticianBot::new(seed))),
+        "ml" => Some(Box::new(MlBot::new(seed))),
         _ => None,
     }
 }
