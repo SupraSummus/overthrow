@@ -135,6 +135,19 @@ fixed `--seed` so what was seen can be seen again.
   Why the freeze is structural rather than a bot limitation —
   and the levers against it —
   is the subject of "Why turtling dominates" below.
+- `ml` (the learned vertical-slice policy, trained only at radius 3;
+  see "ML plan") beats `random` from either seat
+  at every radius tested (3, 4, 5), 50/50 in seeded CLI series —
+  and, like the scripted bots, wins by holding territory
+  to the `max_turns` adjudication rather than by elimination.
+  That it generalizes to radii it never trained on
+  is the encoding earning its keep:
+  the policy reads only a tile's one-hop patch, player-relative,
+  so map size is invisible to it.
+  It has not been pitted against `greedy`/`tactician`
+  as a measured series yet —
+  beating `random` is the slice's bar;
+  climbing the scripted ladder is the scaling work.
 - Six-player free-for-alls (radius 6, one bot per corner) behave the same
   way at the top level: every game still runs to `max_turns` and is
   adjudicated, never won by elimination, for both mirrors — six `greedy`
@@ -219,15 +232,68 @@ so player count is deliberately not the anti-turtling fix.
 It is a cheap experiment to run
 (`--bots` takes 2–6 names, one per corner).
 
-## ML plan (next phases)
+## ML plan
 
-1. Expose the engine to Python via PyO3 (`py/` crate) as a vectorized
-   environment; train PPO self-play (small CNN/GNN over per-tile feature
-   planes: own army, enemy army, resources, ownership).
-2. Export the policy to ONNX; run it in-app with `tract` (pure Rust,
-   Android-friendly). A policy for these map sizes is a few MB, inference
-   well under a millisecond.
-3. Training checkpoints double as a difficulty ladder.
+### Vertical slice (implemented): a learned bot, end to end, in Rust
+
+The first ML milestone is deliberately narrow and entirely in-process:
+a learned `ml` bot that beats `random`,
+with no Python, no ONNX, and no external ML dependency.
+It exists to prove the observation/action encoding is learnable
+and to give the later, heavier work a working reference.
+Three pieces, each documented where it lives:
+
+- The RL-facing state/action encoding is `engine/src/encoding.rs`
+  (feature planes, the discrete action space,
+  and a legality mask derived from `GameState::legal_orders`
+  so it can't drift from the rules).
+- The policy and its trainer are `bot/src/ml/`:
+  a tiny two-layer perceptron over one-hop hex patches (`ml::policy`),
+  trained by episodic REINFORCE with discounted reward-to-go
+  against a scripted opponent (`ml::train`).
+  The reward is the per-turn change in the learner's tile lead;
+  reward-to-go is what makes the credit assignment work,
+  since a lone terminal reward split across a game's hundreds of
+  per-tile decisions barely moves the policy.
+- `MlBot` (`ml::bot`) plays a trained checkpoint
+  through the same `Bot` trait as the scripted bots,
+  so everything that runs them runs it.
+
+**Decision (2026-07): hand-rolled, pure Rust, not a framework.**
+The model is a ~900-weight MLP,
+so its forward and backward passes are a few dozen lines
+and a finite-difference gradient check pins their correctness
+(`ml::policy` tests).
+Against that, pulling a full framework (candle, burn, `tch`)
+into the `bot` crate — which the `cli`, the tests,
+and ultimately the WebAssembly/Android `app` all build —
+is a heavy dependency on a workspace that otherwise has none,
+and `tch` is not even pure Rust.
+The engine's zero-dependency, every-target ethos wins at this size.
+This is a slice, not the ceiling:
+it uses argmax play,
+a fixed scripted opponent rather than self-play,
+and a local policy that cannot see beyond one hex.
+
+### Scaling up (next)
+
+When the model outgrows an MLP the trade flips, and the path is:
+
+1. A larger policy (CNN/GNN over the full per-tile planes)
+   trained by self-play (PPO),
+   reusing the `engine::encoding` contract unchanged.
+2. A training stack heavy enough to deserve a real framework —
+   `candle` (pure Rust, trains and runs) is the natural fit;
+   exposing the engine to Python via a `py/` PyO3 crate
+   for the mature RL tooling remains an option but is no longer required.
+3. In-app inference via `tract` (pure Rust, Android-friendly)
+   once the model is too big to keep hand-rolling:
+   export the trained policy to ONNX and run it under `tract`,
+   keeping the shipped app light while the framework stays on the
+   desktop trainer.
+   A policy for these map sizes is a few MB,
+   inference well under a millisecond.
+4. Training checkpoints double as a difficulty ladder.
 
 Engine speed today (release, single thread): ~800 full games/sec on
 radius 5 (~70k turns/sec), before any optimization. Comfortable for RL.

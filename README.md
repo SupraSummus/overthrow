@@ -22,8 +22,10 @@ preserved under [`old/`](old/) as a reference implementation.
   The single source of truth, intended to be reused unchanged by the
   desktop/Android app, headless simulation, and RL training.
 - `bot/` — opponents implementing the `Bot` trait: `random` (baseline),
-  `greedy` (scripted heuristic) and `tactician` (a stronger heuristic that
-  beats `greedy`). A learned policy bot will slot in here.
+  `greedy` (scripted heuristic), `tactician` (a stronger heuristic that
+  beats `greedy`), and `ml` (a learned policy). The `ml` bot and its
+  pure-Rust trainer live in `bot/src/ml/`; the state/action encoding they
+  build on is `engine/src/encoding.rs`.
 - `cli/` — headless runner for bot-vs-bot matches.
 - `app/` — playable [macroquad](https://macroquad.rs) frontend
   (human vs bot, or spectating a bot-vs-bot match).
@@ -36,7 +38,11 @@ preserved under [`old/`](old/) as a reference implementation.
     cargo run --release -p overthrow-cli -- match --games 200
     cargo run --release -p overthrow-cli -- match --games 1 --render
     cargo run --release -p overthrow-cli -- match --bots tactician,greedy --radius 6
+    cargo run --release -p overthrow-cli -- match --bots ml,random
     cargo run --release -p overthrow-cli -- match --bots greedy,greedy,greedy,greedy,greedy,greedy --radius 6
+
+    # Retrain the ml bot's policy (overwrites bot/src/ml/policy.txt; rebuild to bake it in)
+    cargo run --release -p overthrow-bot --bin train
 
 ## Roadmap
 
@@ -47,5 +53,11 @@ preserved under [`old/`](old/) as a reference implementation.
    (colored hexes and numbers),
    so immediate-mode drawing fits and the ECS machinery would be overhead;
    it also covers web, which a native-only stack would not.
-3. RL self-play training (engine exposed to Python via PyO3, PPO policy,
-   exported to ONNX, inference in-app via `tract`)
+3. ✅ Learned bot, pure-Rust vertical slice:
+   a state/action encoding in the engine,
+   a tiny policy trained in-process by REINFORCE,
+   playing through the same `Bot` trait as the scripted bots (`bot/src/ml/`).
+4. Scale the learned policy up (larger net, self-play, richer training).
+   See `DESIGN.md` ("ML plan") for the path —
+   including where a framework like `candle` (training)
+   and `tract` (in-app inference) would replace the hand-rolled slice.

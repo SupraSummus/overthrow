@@ -6,8 +6,10 @@
 //! and (later) reinforcement-learning training loops.
 
 pub mod coords;
+pub mod encoding;
 pub mod game;
 pub mod rng;
 
 pub use coords::{Direction, Hex};
+pub use encoding::{ACTIONS_PER_TILE, NUM_PLANES};
 pub use game::{Config, GameState, MoveAmount, Order, Outcome, PlayerId, Tile};
