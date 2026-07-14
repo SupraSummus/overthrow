@@ -180,4 +180,4 @@ fn golden_game_final_state_is_pinned() {
 }
 
 const GOLDEN_TURNS: u32 = 200;
-const GOLDEN_HASH: u64 = 1061877323026431320;
+const GOLDEN_HASH: u64 = 237611136291689839;

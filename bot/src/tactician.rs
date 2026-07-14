@@ -1,20 +1,20 @@
 //! `TacticianBot`: a scripted heuristic that beats `GreedyBot`.
 //!
 //! Under the v1 rules a careful player wins the two-player game
-//! without ever breaking a defense:
+//! without ever breaking a garrison:
 //! games are decided on tile count at `Config::max_turns`,
 //! and a frontier garrison the command-point-capped attacker cannot
 //! out-fund holds indefinitely
-//! (why this favours the defender: `DESIGN.md`, "Why turtling dominates";
+//! (why this favours the holder: `DESIGN.md`, "Why turtling dominates";
 //! the combat that makes a held tile stick is `GameState::step`).
 //! So the tactician wins the neutral land grab and holds it,
-//! instead of trading armies into the defense bonus like `GreedyBot`.
+//! instead of trading armies into a full-strength garrison like `GreedyBot`.
 //!
 //! Three things distinguish it from `GreedyBot`:
 //!
 //! - Command-point-aware funding (`crate::take_budget_floored`):
 //!   an attack is kept only when the pool will actually pay for a force
-//!   that still beats the defender,
+//!   that still out-presents the garrison,
 //!   never the under-funded overrun `GreedyBot` throws away.
 //! - It claims neutral tiles toward the map centre first
 //!   — the ground both players race for —
@@ -68,13 +68,11 @@ impl TacticianBot {
     }
 
     /// The garrison that survives `threat` incoming armies with a unit to
-    /// spare: the smallest `g` with `g * defense_bonus_pct / 100 > threat`.
+    /// spare: the smallest `g` with `g > threat`, i.e. `threat + 1`.
     /// A tile held this strongly keeps both its ownership
-    /// and a defending army through one maximal enemy turn.
-    fn garrison_to_hold(state: &GameState, threat: u64) -> u64 {
-        let bonus = state.config.defense_bonus_pct as u64;
-        // Smallest g with g*bonus/100 > threat  <=>  g*bonus > threat*100.
-        (threat * 100) / bonus + 1
+    /// and a surviving garrison through one maximal enemy turn.
+    fn garrison_to_hold(threat: u64) -> u64 {
+        threat + 1
     }
 }
 
@@ -85,7 +83,6 @@ impl Bot for TacticianBot {
 
     fn orders(&mut self, state: &GameState, me: PlayerId) -> Vec<Order> {
         let frontier = frontier_distances(state, me);
-        let bonus = state.config.defense_bonus_pct as i64;
         let radius = state.config.radius;
         let center = Hex::new(0, 0);
         let mut candidates: Vec<Candidate> = Vec::new();
@@ -103,7 +100,7 @@ impl Bot for TacticianBot {
             // exposed the tile, the earlier it is funded.
             if threatened
                 && tile.resources > 0
-                && (tile.army as u64) < Self::garrison_to_hold(state, threat)
+                && (tile.army as u64) < Self::garrison_to_hold(threat)
             {
                 candidates.push(Candidate {
                     priority: 1000 + threat as i64,
@@ -147,10 +144,10 @@ impl Bot for TacticianBot {
                     // Enemy tile: rank a capture (a two-tile swing) by how
                     // cheap the kill is. The `needed` floor is what makes the
                     // attack safe — the funding pass drops it unless the pool
-                    // pays for a force that strictly beats the bonus-scaled
-                    // defender, so an under-funded attack is never issued.
+                    // pays for a force that strictly outnumbers the garrison,
+                    // so an under-funded attack is never issued.
                     Some(owner) if owner != me => {
-                        let needed = (next.army as i64 * bonus) / 100 + 1;
+                        let needed = next.army as i64 + 1;
                         if (tile.army as i64) >= needed {
                             candidates.push(Candidate {
                                 priority: 800 - needed,

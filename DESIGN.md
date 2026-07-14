@@ -50,7 +50,7 @@ the two cross-cutting intents no single item can show:
 |---|---|---|
 | Move order targets any tile, engine paths one hex/turn | Move targets an adjacent tile only | Long moves are UI sugar over the same mechanic; per-step orders shrink the ML action space to `tiles × 6 × 2 + recruit` per order slot (passing = submitting fewer orders; there is no explicit pass order) |
 | Command points: earned, spent per army per step, accumulated to a cap | Per-army `command_points` pool spent per step, no accumulation | Kept the per-army cost — it makes force projection the scarce resource and offensives staged rather than free. Dropped only accumulation, which existed to let idle players catch up — irrelevant for local/AI games (decision, 2026-07) |
-| Multi-turn attrition combat with attack/defense efficiency constants | Single-step strongest-party-wins with defense bonus | Fewer states in flight, no movement records to track, easier credit assignment for RL. Attrition combat can return if fights feel too binary |
+| Multi-turn attrition combat with attack/defense efficiency constants | Single step, no defense — only mutual attack: a stationary garrison deals no damage, so a winning attacker keeps its full force | Fewer states in flight, no movement records to track, easier credit assignment for RL. A garrison is presence you must out-deliver, not an army that fights back; the defender bonus that shipped in early v1 went with it (see "Why turtling dominates") |
 | Real-time ticks, no end | Discrete turns, `max_turns` limit, tile-count victory | RL needs episodes; a single-player game needs an ending |
 | Corporations, boss trees, transfers | Omitted | Out of scope for single-player vs AI (deliberate decision, 2026-07) |
 | Army cap tied to CP cap | No cap | Keep constants minimal; revisit if unbounded stacks distort play |
@@ -110,7 +110,7 @@ fixed `--seed` so what was seen can be seen again.
   is decided on tile count. It wins the opening land grab (claiming toward
   the contested centre with pool-efficient moves, holding the frontier with
   garrisons the capped attacker cannot out-fund) and freezes ahead, rather
-  than trading armies into the defense bonus. So the `greedy`-mirror freeze
+  than trading armies into a full-strength garrison. So the `greedy`-mirror freeze
   was partly a `greedy` limitation — a better land-grabber simply owns more
   of the board when the lead locks in — not purely structural; `tactician`
   still cannot break `greedy`'s turtle, only out-turtle it (see "Why
@@ -170,19 +170,25 @@ so a stronger opponent (including a learned one)
 would turtle harder, not break the stalemate.
 Three legs:
 
-- Offense is capped, defense is not.
+- Offense is capped, presence is not.
   The command-point pool is charged per army moved,
   out of one shared per-turn pool,
-  so a player projects at most `Config::command_points` armies per turn
+  so a player delivers at most `Config::command_points` armies
+  to any one tile in a turn
   no matter how long they stage,
-  while a garrison persists indefinitely
-  and defends at full size times `Config::defense_bonus_pct`.
-  A garrison of the pool divided by the bonus (16 at defaults)
-  already forces at best mutual annihilation.
-- Every attack into defense trades at the bonus exchange rate,
-  and both sides convert the same per-turn pool into board effect
-  (raising or moving),
-  so an attacker can never out-produce the losses.
+  while a garrison persists indefinitely.
+  Taking a tile means out-presenting its garrison in a single turn,
+  so a garrison matching the pool (20 at defaults) cannot be taken:
+  the most an attack can muster only matches it, which annihilates.
+- Cheaper offense does not obviously help.
+  A won attack keeps the attacker's full force —
+  the garrison strikes for nothing —
+  so offense costs less than it did under attrition,
+  yet no single turn can still deliver past a pool-sized garrison,
+  and whittling one down trades even
+  while the defender re-recruits from its own equal pool.
+  Both sides convert the same per-turn pool into board effect,
+  so neither out-delivers the other's regeneration.
 - Passivity is free and wins:
   resources grow whether or not a player acts,
   stacks never decay,
@@ -197,7 +203,7 @@ if it can beat `greedy`, the argument is wrong.
 `tactician` beating `greedy` is not that falsification:
 it wins the tile-count adjudication by out-grabbing the neutral land
 and never by breaking a garrison,
-so its sweep is over-turtling, not offense out-delivering defense —
+so its sweep is over-turtling, not an attack out-delivering a garrison —
 the leg the test targets still stands.
 
 Each candidate anti-turtling lever attacks one leg:
@@ -210,6 +216,30 @@ implement the levers as `Config` knobs,
 run the gameplay-health metrics per variant,
 and keep the one lever that restores elimination and comebacks —
 one, because every surviving constant must earn its place.
+
+Decision (2026-07-14): removed the notion of defense entirely.
+A stationary garrison used to fight back for free —
+the "auto-defense" that made holding cost the attacker armies —
+and carried a 1.25x bonus (`defense_bonus_pct`) on top;
+both are gone.
+A garrison now strikes for nothing
+(to inflict losses an army must be commanded to move),
+and the bonus had no meaning once there is no defense to scale.
+
+Whether this loosens the turtle is still open.
+The headline matchups are unmoved —
+`greedy` still beats `random` about three-quarters by elimination
+(avg ~420 turns) and `tactician` still freezes `greedy`
+to the turn limit — but that is weak evidence:
+`greedy` and `tactician` were shaped under the old rules
+and never attack a garrison they cannot overrun in one turn,
+so neither tests whether cheaper offense now pays.
+The structural reason to expect the freeze to survive is unchanged
+(the per-turn pool caps delivery to any one tile,
+so a pool-sized garrison still cannot be taken in a turn),
+but the clean check is the turtle-breaker bot proposed above,
+which has not been run.
+The offense cap and free passivity remain the legs to target.
 
 In principle more players weakens the first leg:
 the offense cap is per player,

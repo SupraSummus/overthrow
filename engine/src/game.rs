@@ -47,8 +47,6 @@ pub struct Config {
     /// settling at the emergent cap `Config::resource_equilibrium`.
     /// A percentage, so it must be in `1..=100`.
     pub maintenance_pct: u32,
-    /// Defender strength multiplier in percent (125 = 1.25x).
-    pub defense_bonus_pct: u32,
 }
 
 impl Config {
@@ -73,7 +71,6 @@ impl Default for Config {
             initial_resources: 10,
             production: 2,
             maintenance_pct: 2,
-            defense_bonus_pct: 125,
         }
     }
 }
@@ -354,8 +351,11 @@ impl GameState {
     /// processing order is irrelevant: departures and recruits happen
     /// "at once", then everything lands and fights, then resources flow
     /// (production minus maintenance).
-    /// One order per tile per turn also means recruited armies defend
-    /// immediately but cannot move until the next turn.
+    /// Combat is mutual attack with no defense: only armies commanded to
+    /// move strike, so a stationary garrison deals no damage and a winning
+    /// attacker keeps its full force (see the combat step below).
+    /// One order per tile per turn also means recruited armies join the
+    /// garrison immediately but cannot move until the next turn.
     pub fn step(&mut self, orders: &[Vec<Order>]) -> Outcome {
         assert_eq!(orders.len(), self.config.players as usize);
 
@@ -409,59 +409,57 @@ impl GameState {
             }
         }
 
-        let defense_bonus_pct = self.config.defense_bonus_pct as u64;
-        for (dst, mut parties) in arrivals {
+        for (dst, parties) in arrivals {
             let tile = &mut self.tiles[dst];
             // Neutral tiles never hold armies (ownership never reverts), so
             // there is no "neutral garrison" party to account for.
             debug_assert!(tile.owner.is_some() || tile.army == 0);
 
-            // The defender's party is the garrison plus any same-owner
-            // arrivals; the whole party gets the defense bonus.
-            if let Some(owner) = tile.owner {
-                *parties.entry(owner).or_default() += tile.army as u64;
+            // There is no defense, only mutual attack: a stationary garrison
+            // deals no damage — to strike, an army must be ordered to move.
+            // Track each party as (player, presence, attack): presence
+            // (arrivals, plus the owner's garrison) decides who holds the
+            // tile; attack (arrivals alone) is what costs the others armies.
+            let owner = tile.owner;
+            let mut forces: Vec<(PlayerId, u64, u64)> =
+                parties.into_iter().map(|(p, arr)| (p, arr, arr)).collect();
+            // Fold the owner's garrison into its presence, adding the owner as
+            // a pure-garrison party when it commanded no arrivals of its own.
+            let garrison = tile.army as u64;
+            if let Some(o) = owner.filter(|_| garrison > 0) {
+                match forces.iter_mut().find(|f| f.0 == o) {
+                    Some(f) => f.1 += garrison,
+                    None => forces.push((o, garrison, 0)),
+                }
             }
-            let defender = tile.owner;
 
-            if parties.len() == 1 {
-                let (player, amount) = parties.into_iter().next().unwrap();
+            if forces.len() == 1 {
+                let (player, present, _) = forces[0];
                 tile.owner = Some(player);
-                tile.army = amount.min(u32::MAX as u64) as u32;
+                tile.army = present.min(u32::MAX as u64) as u32;
                 continue;
             }
 
-            // Deterministic single-step combat: the strongest party survives,
-            // paying the combined effective strength of everyone else.
-            let effective = |p: PlayerId, actual: u64| -> u64 {
-                if Some(p) == defender {
-                    actual * defense_bonus_pct / 100
-                } else {
-                    actual
-                }
-            };
-            let mut ranked: Vec<(PlayerId, u64, u64)> = parties
-                .iter()
-                .map(|(&p, &a)| (p, a, effective(p, a)))
-                .collect();
-            // Strongest first; player id breaks ties deterministically.
-            ranked.sort_by_key(|&(p, _, eff)| (std::cmp::Reverse(eff), p));
+            // Deterministic single-step combat: the largest presence holds the
+            // tile, paying only the combined attack of everyone else — a
+            // garrison strikes for nothing, so overrunning it is free. The
+            // owner wins ties, so an attacker that merely matches a garrison
+            // annihilates against it rather than taking the tile.
+            forces
+                .sort_by_key(|&(p, present, _)| (std::cmp::Reverse(present), Some(p) != owner, p));
 
-            let (winner, winner_actual, winner_eff) = ranked[0];
-            let losses_eff: u64 = ranked[1..].iter().map(|&(_, _, eff)| eff).sum();
+            let (winner, winner_present, _) = forces[0];
+            let losses: u64 = forces[1..].iter().map(|&(_, _, attack)| attack).sum();
 
-            if winner_eff <= losses_eff {
-                // Mutual annihilation (covers exact ties for first place,
-                // since the runner-up alone already matches winner_eff):
-                // tile keeps its owner but is left undefended.
+            if winner_present <= losses {
+                // Mutual annihilation (covers a tie for the largest presence,
+                // since the runner-up's attack alone then matches the winner):
+                // the tile keeps its owner but is left undefended.
                 tile.army = 0;
                 continue;
             }
-            // Convert the winner's surviving effective strength back to
-            // actual units (u128: the product can exceed u64 for huge armies).
-            let surviving =
-                (winner_eff - losses_eff) as u128 * winner_actual as u128 / winner_eff as u128;
             tile.owner = Some(winner);
-            tile.army = surviving.min(u32::MAX as u128) as u32;
+            tile.army = (winner_present - losses).min(u32::MAX as u64) as u32;
         }
 
         // Flat production minus stockpile-scaled maintenance; converges up to
@@ -723,31 +721,51 @@ mod tests {
     }
 
     #[test]
-    fn defender_with_bonus_repels_equal_attack() {
+    fn equal_attack_annihilates_both_sides() {
         let mut s = state();
         let initial = s.config.initial_army;
         let (p0_start, attacker_hex, back) = stage_attack(&mut s, initial);
 
         s.step(&[vec![], vec![move_all(attacker_hex, back)]]);
 
-        // Equal armies, but the defender's 1.25x bonus wins the fight.
+        // The attacker only matches the garrison, so neither holds the tile:
+        // it stays the owner's but is left undefended.
         let defended = s.tile(p0_start).unwrap();
         assert_eq!(defended.owner, Some(PlayerId(0)));
-        assert!(defended.army > 0);
-        assert!(defended.army < s.config.initial_army);
+        assert_eq!(defended.army, 0);
     }
 
     #[test]
-    fn overwhelming_attack_conquers() {
+    fn understrength_attack_leaves_the_garrison_standing() {
         let mut s = state();
         let initial = s.config.initial_army;
-        let (p0_start, attacker_hex, back) = stage_attack(&mut s, initial * 10);
+        // Attacker musters one fewer army than the garrison it charges.
+        let (p0_start, attacker_hex, back) = stage_attack(&mut s, initial - 1);
 
         s.step(&[vec![], vec![move_all(attacker_hex, back)]]);
 
+        // The garrison took the attacker's fire and holds with what is left
+        // (initial - (initial - 1) = 1).
+        let defended = s.tile(p0_start).unwrap();
+        assert_eq!(defended.owner, Some(PlayerId(0)));
+        assert_eq!(defended.army, 1);
+    }
+
+    #[test]
+    fn winning_attacker_keeps_its_full_force() {
+        let mut s = state();
+        let initial = s.config.initial_army;
+        // One army over the garrison is enough to take the tile.
+        let attackers = initial + 1;
+        let (p0_start, attacker_hex, back) = stage_attack(&mut s, attackers);
+
+        s.step(&[vec![], vec![move_all(attacker_hex, back)]]);
+
+        // The garrison dealt no damage, so the attacker keeps every army it
+        // brought — the whole point of "no defense, only mutual attack".
         let taken = s.tile(p0_start).unwrap();
         assert_eq!(taken.owner, Some(PlayerId(1)));
-        assert!(taken.army > 0);
+        assert_eq!(taken.army, attackers);
         // Player 0 lost their only tile: game over.
         assert_eq!(s.outcome(), Outcome::Winner(PlayerId(1)));
     }
@@ -767,10 +785,11 @@ mod tests {
 
         s.step(&[vec![], vec![move_all(attacker_hex, back)]]);
 
+        // The garrison strikes for nothing, so a u32::MAX attacker survives at
+        // full strength — the count is clamped to the tile's u32, not wrapped.
         let taken = s.tile(p0_start).unwrap();
         assert_eq!(taken.owner, Some(PlayerId(1)));
-        assert!(taken.army > 0);
-        assert!(taken.army < u32::MAX);
+        assert_eq!(taken.army, u32::MAX);
     }
 
     #[test]
