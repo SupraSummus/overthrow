@@ -23,9 +23,11 @@ preserved under [`old/`](old/) as a reference implementation.
   desktop/Android app, headless simulation, and RL training.
 - `bot/` — opponents implementing the `Bot` trait: `random` (baseline),
   `greedy` (scripted heuristic), `tactician` (a stronger heuristic that
-  beats `greedy`), and `ml` (a learned policy). The `ml` bot and its
-  pure-Rust trainer live in `bot/src/ml/`; the state/action encoding they
-  build on is `engine/src/encoding.rs`.
+  beats `greedy`), `future` (a one-ply lookahead that picks its turn by
+  simulating each candidate order forward and keeping the highest-scoring
+  resulting position, beating `tactician`), and `ml` (a learned policy). The
+  `ml` bot and its pure-Rust trainer live in `bot/src/ml/`; the state/action
+  encoding they build on is `engine/src/encoding.rs`.
 - `cli/` — headless runner for bot-vs-bot matches.
 - `app/` — playable [macroquad](https://macroquad.rs) frontend
   (human vs bot, or spectating a bot-vs-bot match).
