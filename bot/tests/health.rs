@@ -88,6 +88,22 @@ fn ml_beats_random_from_either_seat() {
     );
 }
 
+/// The ladder's top rung: `future` (one-ply lookahead over an evaluation
+/// function) beats `tactician` decisively from either seat, mostly on the
+/// tile-count standings but now also by the occasional elimination, since
+/// removing the defender bonus has loosened the turtle. Guards against an
+/// evaluation or search change that regresses the strongest bot below the
+/// heuristic it is meant to top.
+#[test]
+fn future_dominates_tactician_from_either_seat() {
+    let as_p0 = run_series(("future", "tactician"), 20).wins_of(PlayerId(0));
+    let as_p1 = run_series(("tactician", "future"), 20).wins_of(PlayerId(1));
+    assert!(
+        as_p0 >= 18 && as_p1 >= 18,
+        "future should dominate tactician from either seat, won {as_p0}/20 as P0, {as_p1}/20 as P1"
+    );
+}
+
 /// Fairness: strength must not depend on seat order. The setup is
 /// symmetric and turns resolve simultaneously, so greedy must dominate
 /// random equally as P0 and as P1.

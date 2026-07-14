@@ -120,6 +120,17 @@ fixed `--seed` so what was seen can be seen again.
   the lower player id — which its centre-axis march runs into more often
   than `greedy`'s looser expansion, but that is unverified analysis, not a
   measured decomposition.
+- `future` (the future-evaluating bot; see "A future-evaluating bot")
+  tops the scripted ladder: at radius 4 in seeded series it sweeps
+  `tactician` from either seat.
+  It wins mostly by holding territory to the tile-count adjudication,
+  but now that removing the defender bonus has loosened the turtle
+  it also takes the occasional game by elimination.
+  Its mirror is the *most* contested match measured —
+  ~60 lead changes per game and comebacks in nearly half of games,
+  against the `tactician` mirror's near-frozen ~1.6 —
+  because two strong best-responders keep trading the frontier
+  instead of freezing an early lead.
 - Mirror matches are ~50/50 with no first-player advantage — the setup is
   symmetric and turns are truly simultaneous.
 - *Both* mirrors always hit `max_turns` and get decided by tile-count
@@ -261,6 +272,52 @@ not the two-player duel depth the ML plan targets,
 so player count is deliberately not the anti-turtling fix.
 It is a cheap experiment to run
 (`--bots` takes 2–6 names, one per corner).
+
+## A future-evaluating bot (`future`)
+
+`future` (implemented in `bot/src/future_tree.rs`, which owns the mechanics)
+is the skeleton of a classical game engine —
+one-ply search plus a static evaluation —
+adapted to a game that breaks the assumptions chess-style search relies on:
+turns are simultaneous,
+so the opponent is a fixed model rather than a minimising node;
+and a turn is a whole *set* of orders whose power set is far too wide
+to enumerate,
+so the plan is built greedily, one order at a time by evaluated value,
+in place of enumerating legal moves.
+It is the strongest non-learned bot, sweeping `tactician` from either seat.
+
+The edge over `tactician` is that it optimises the *resolved* position
+directly —
+its evaluation refuses any order that loses army on net and prices every tile —
+so it grabs and holds neutral land at least as efficiently,
+never issuing the under-funded overruns the scripted bots throw away.
+
+Why one ply and not deeper — a measured, rules-dependent result.
+A genuine multi-turn best-response search was built and tried:
+each turn branches over a small candidate-plan menu,
+our own continuation is *searched* rather than played out by a weak policy,
+and `evaluate` is applied only at the leaf.
+Under the earlier rules — a stationary garrison struck back
+with a 1.25x defender bonus — it earned its cost:
+depth two beat one ply roughly 15/9 and won some games by elimination,
+because cracking a bonus-backed garrison needs a multi-turn build-up
+that a single ply cannot see.
+Removing defense (see "Why turtling dominates") erased that edge:
+overrunning a garrison is now a one-turn threshold,
+so there is nothing multi-turn left to discover,
+and depth two comes out even-to-slightly-behind one ply
+at roughly 11x the cost (each added turn re-runs the opponent model
+for every candidate). So the shipped bot is one ply.
+
+The lesson underneath is the one classical engines encode:
+do not score a leaf by playing on with a weak policy —
+an early attempt rolled the extra turns with `TacticianBot` and lost,
+since it was really scoring "what if I then play like a weaker bot" —
+but search, and score the leaf with a function you trust.
+Deeper search pays only once that leaf evaluator is at least as strong
+as the search itself: a learned value function, not a scripted playout,
+which is the AlphaZero/NNUE direction the next section takes.
 
 ## ML plan
 

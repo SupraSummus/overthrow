@@ -3,8 +3,12 @@
 //! `RandomBot` is the sanity baseline,
 //! `GreedyBot` a scripted heuristic,
 //! and `TacticianBot` a stronger heuristic that beats it.
-//! A learned (neural-network) bot will implement the same `Bot` trait later,
-//! so everything that can run these can run it.
+//! `FutureTreeBot` drops the hand-tuned priorities and picks its turn by
+//! simulating each candidate order forward and keeping the one whose
+//! resulting position scores best, beating `TacticianBot`.
+//! `MlBot` is a learned-policy vertical slice.
+//! Everything that can run these can run a future learned policy too,
+//! since they all implement the same `Bot` trait.
 //! `make_bot` is the name registry,
 //! and `BOT_NAMES` lists every name it accepts.
 
@@ -13,10 +17,12 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use overthrow_engine::rng::Rng;
 use overthrow_engine::{Config, GameState, Hex, MoveAmount, Order, Outcome, PlayerId};
 
+pub mod future_tree;
 pub mod ml;
 pub mod stats;
 pub mod tactician;
 
+pub use future_tree::FutureTreeBot;
 pub use ml::MlBot;
 pub use stats::{MatchRecord, SeriesStats};
 pub use tactician::TacticianBot;
@@ -277,7 +283,7 @@ impl Bot for GreedyBot {
 
 /// Every name `make_bot` accepts, for CLI usage and error strings so the
 /// list is written once. Keep in sync with `make_bot`'s match arms.
-pub const BOT_NAMES: &[&str] = &["random", "greedy", "tactician", "ml"];
+pub const BOT_NAMES: &[&str] = &["random", "greedy", "tactician", "ml", "future"];
 
 pub fn make_bot(name: &str, seed: u64) -> Option<Box<dyn Bot>> {
     match name {
@@ -285,6 +291,7 @@ pub fn make_bot(name: &str, seed: u64) -> Option<Box<dyn Bot>> {
         "greedy" => Some(Box::new(GreedyBot::new(seed))),
         "tactician" => Some(Box::new(TacticianBot::new(seed))),
         "ml" => Some(Box::new(MlBot::new(seed))),
+        "future" => Some(Box::new(FutureTreeBot::new(seed))),
         _ => None,
     }
 }
