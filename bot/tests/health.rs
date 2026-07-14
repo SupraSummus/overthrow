@@ -56,7 +56,7 @@ fn greedy_dominates_random_by_elimination() {
 /// The scripted ladder must have a top rung:
 /// `tactician` beats `greedy` decisively from either seat.
 /// It wins the neutral land grab and holds it to the tile-count adjudication
-/// rather than trading into the defense bonus,
+/// rather than trading into a full-strength garrison,
 /// so — like every `greedy` mirror — these games run to the turn limit;
 /// the win shows up in the standings, not in eliminations.
 /// Guards against a change that lets `greedy`

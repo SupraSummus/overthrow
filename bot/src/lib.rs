@@ -225,11 +225,10 @@ impl Bot for GreedyBot {
                         ));
                         moved_somewhere = true;
                     }
-                    // Enemy tile: attack only with a margin over what the
-                    // configured defense bonus makes the defender worth.
+                    // Enemy tile: attack only with a margin that strictly
+                    // outnumbers the enemy garrison.
                     Some(owner) if owner != me => {
-                        let needed =
-                            (next.army as i64 * state.config.defense_bonus_pct as i64) / 100 + 1;
+                        let needed = next.army as i64 + 1;
                         if (tile.army as i64) >= needed {
                             scored.push((
                                 800 + (tile.army as i64 - needed),
